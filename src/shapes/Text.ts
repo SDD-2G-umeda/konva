@@ -36,6 +36,7 @@ export interface TextConfig extends ShapeConfig {
   letterSpacing?: number;
   wrap?: string;
   ellipsis?: boolean;
+  vertical?: boolean;
 }
 
 // constants
@@ -79,9 +80,16 @@ var AUTO = 'auto',
     'wrap',
     'ellipsis',
     'letterSpacing',
+    'vertical'
   ],
   // cached variables
-  attrChangeListLen = ATTR_CHANGE_LIST.length;
+  attrChangeListLen = ATTR_CHANGE_LIST.length,
+  /** （縦書き）行間 */
+  VERTICAL_SPACING = 8,
+  /** （縦書き）下線と文字の距離 */
+  VERTICAL_UNDERLINE_SPACING = 1,
+  /** （縦書き）下線の太さ */
+  UNDERLINE_WIDTH = 2;
 
 function normalizeFontFamily(fontFamily: string) {
   return fontFamily
@@ -96,17 +104,6 @@ function normalizeFontFamily(fontFamily: string) {
       return family;
     })
     .join(', ');
-}
-
-var dummyContext: CanvasRenderingContext2D;
-function getDummyContext() {
-  if (dummyContext) {
-    return dummyContext;
-  }
-  dummyContext = Util.createCanvasElement().getContext(
-    CONTEXT_2D
-  ) as CanvasRenderingContext2D;
-  return dummyContext;
 }
 
 function _fillFunc(this: Text, context: Context) {
@@ -163,7 +160,7 @@ function checkDefaultFill(config?: TextConfig) {
  * });
  */
 export class Text extends Shape<TextConfig> {
-  textArr: Array<{ text: string; width: number; lastInParagraph: boolean }>;
+  textArr: Array<{ text: string; width: number; height: number, lastInParagraph: boolean }>;
   _partialText: string;
   _partialTextX = 0;
   _partialTextY = 0;
@@ -189,6 +186,7 @@ export class Text extends Shape<TextConfig> {
 
     var padding = this.padding(),
       fontSize = this.fontSize(),
+      fontFamily = this._getContextFont(),
       lineHeightPx = this.lineHeight() * fontSize,
       verticalAlign = this.verticalAlign(),
       direction = this.direction(),
@@ -198,17 +196,16 @@ export class Text extends Shape<TextConfig> {
       letterSpacing = this.letterSpacing(),
       fill = this.fill(),
       textDecoration = this.textDecoration(),
+      vertical = this.vertical(),
       shouldUnderline = textDecoration.indexOf('underline') !== -1,
       shouldLineThrough = textDecoration.indexOf('line-through') !== -1,
       n;
     
     direction = direction === INHERIT ? context.direction : direction;
 
-    var translateY = 0;
     var translateY = lineHeightPx / 2;
 
     var lineTranslateX = 0;
-    var lineTranslateY = 0;
 
     if (direction === RTL) {
       context.setAttr('direction', direction);
@@ -231,12 +228,13 @@ export class Text extends Shape<TextConfig> {
     context.translate(padding, alignY + padding);
 
     // draw text lines
+    var lineTranslateX = this.getWidth() - padding * 2
+    
     for (n = 0; n < textArrLen; n++) {
-      var lineTranslateX = 0;
-      var lineTranslateY = 0;
       var obj = textArr[n],
         text = obj.text,
-        width = obj.width,
+        width = Math.max(obj.width, fontSize),
+        height = obj.height,
         lastLine = obj.lastInParagraph,
         spacesNumber,
         oneWord,
@@ -244,94 +242,167 @@ export class Text extends Shape<TextConfig> {
 
       // horizontal alignment
       context.save();
-      if (align === RIGHT) {
-        lineTranslateX += totalWidth - width - padding * 2;
-      } else if (align === CENTER) {
-        lineTranslateX += (totalWidth - width - padding * 2) / 2;
-      }
+      if (vertical) {
+        translateY = fontSize / 2;
+        lineTranslateX -= width;
+        if (n !== 0) {
+          lineTranslateX -= VERTICAL_SPACING
+        }
+        for (var char of text) {
+          // Note: l などの細い文字を中央寄せにする
+          const size = Konva.measureText(char, fontSize, fontFamily, vertical);
+          const diffX = (width - size.width) / 2;
 
-      if (shouldUnderline) {
-        context.save();
-        context.beginPath();
+          this._partialText = char;
+          const isRotate = Konva.VERTICAL_ROTATE_90.includes(char);
+          const isRotateUp =  Konva.VERTICAL_ROTATE_90_UP.includes(char);
+          const isRotateDown =  Konva.VERTICAL_ROTATE_90_DOWN.includes(char);
+          if (isRotate || isRotateUp || isRotateDown) {
+            this._partialTextX = 0;
+            this._partialTextY = 0;
+            let rotateDiffX: number;
+            let rotateDiffY: number;
+            if (isRotate) {
+              // Note: [] などが半角の場合に元々下にずれているが、
+              // 回転させることでさらにズレが目立つようになるので 0.65 に調整している
+              rotateDiffX = size.width * 0.65
+              rotateDiffY = size.height * 0.5
+            } else if (isRotateUp) {
+              rotateDiffX = size.width * 0.5
+              rotateDiffY = size.height * 0.65
+            } else {
+              rotateDiffX = size.width * 0.5
+              rotateDiffY = size.height * 0.35
+            }
+            context.save();
+            context.translate(lineTranslateX + diffX + rotateDiffX, translateY - rotateDiffY)
+            context.rotate(Math.PI / 2);
+            context.fillStrokeShape(this);
 
-        context.moveTo(
-          lineTranslateX,
-          translateY + lineTranslateY + Math.round(fontSize / 2)
-        );
-        spacesNumber = text.split(' ').length - 1;
-        oneWord = spacesNumber === 0;
-        lineWidth =
-          align === JUSTIFY && !lastLine ? totalWidth - padding * 2 : width;
-        context.lineTo(
-          lineTranslateX + Math.round(lineWidth),
-          translateY + lineTranslateY + Math.round(fontSize / 2)
-        );
-
-        // I have no idea what is real ratio
-        // just /15 looks good enough
-        context.lineWidth = fontSize / 15;
-
-        const gradient = this._getLinearGradient();
-        context.strokeStyle = gradient || fill;
-        context.stroke();
-        context.restore();
-      }
-      if (shouldLineThrough) {
-        context.save();
-        context.beginPath();
-        context.moveTo(lineTranslateX, translateY + lineTranslateY);
-        spacesNumber = text.split(' ').length - 1;
-        oneWord = spacesNumber === 0;
-        lineWidth =
-          align === JUSTIFY && lastLine && !oneWord
-            ? totalWidth - padding * 2
-            : width;
-        context.lineTo(
-          lineTranslateX + Math.round(lineWidth),
-          translateY + lineTranslateY
-        );
-        context.lineWidth = fontSize / 15;
-        const gradient = this._getLinearGradient();
-        context.strokeStyle = gradient || fill;
-        context.stroke();
-        context.restore();
-      }
-      // As `letterSpacing` isn't supported on Safari, we use this polyfill.
-      // The exception is for RTL text, which we rely on native as it cannot
-      // be supported otherwise.
-      if (direction !== RTL && (letterSpacing !== 0 || align === JUSTIFY)) {
-        //   var words = text.split(' ');
-        spacesNumber = text.split(' ').length - 1;
-        var array = stringToArray(text);
-        for (var li = 0; li < array.length; li++) {
-          var letter = array[li];
-          // skip justify for the last line
-          if (letter === ' ' && !lastLine && align === JUSTIFY) {
-            lineTranslateX += (totalWidth - padding * 2 - width) / spacesNumber;
-            // context.translate(
-            //   Math.floor((totalWidth - padding * 2 - width) / spacesNumber),
-            //   0
-            // );
+            // 回転した分戻す
+            context.restore();
+          } else {
+            if ( Konva.VERTICAL_TOP_RIGHT.includes(char)) {
+              this._partialTextX = lineTranslateX + diffX + size.width / 8;
+              this._partialTextY = translateY - size.height / 8;
+            } else if ( Konva.VERTICAL_TOP_RIGHT_OVER.includes(char)) {
+              this._partialTextX = lineTranslateX + diffX + size.width * 0.65;
+              this._partialTextY = translateY - size.height / 2;
+            }  else {
+              this._partialTextX = lineTranslateX + diffX;
+              this._partialTextY = translateY;
+            }
+            context.fillStrokeShape(this);
           }
-          this._partialTextX = lineTranslateX;
-          this._partialTextY = translateY + lineTranslateY;
-          this._partialText = letter;
-          context.fillStrokeShape(this);
-          lineTranslateX += this.measureSize(letter).width + letterSpacing;
+          translateY += size.height;
+        }
+        context.restore();
+
+        if (shouldUnderline) {
+          context.save();
+          context.beginPath();
+
+          const underLineX = lineTranslateX + width + VERTICAL_UNDERLINE_SPACING;
+          context.moveTo(underLineX, 0);
+          context.lineTo(underLineX, height);
+          context.lineWidth = UNDERLINE_WIDTH;
+
+          const gradient = this._getLinearGradient();
+          context.strokeStyle = gradient || fill;
+          context.stroke();
+          context.restore();
         }
       } else {
-        if (letterSpacing !== 0) {
-          context.setAttr('letterSpacing', `${letterSpacing}px`);
+        lineTranslateX = 0;
+        if (align === RIGHT) {
+          lineTranslateX += totalWidth - width - padding * 2;
+        } else if (align === CENTER) {
+          lineTranslateX += (totalWidth - width - padding * 2) / 2;
         }
-        this._partialTextX = lineTranslateX;
-        this._partialTextY = translateY + lineTranslateY;
-        this._partialText = text;
 
-        context.fillStrokeShape(this);
-      }
-      context.restore();
-      if (textArrLen > 1) {
-        translateY += lineHeightPx;
+        if (shouldUnderline) {
+          context.save();
+          context.beginPath();
+
+          context.moveTo(
+            lineTranslateX,
+            translateY + Math.round(fontSize / 2)
+          );
+          spacesNumber = text.split(' ').length - 1;
+          oneWord = spacesNumber === 0;
+          lineWidth =
+            align === JUSTIFY && !lastLine ? totalWidth - padding * 2 : width;
+          context.lineTo(
+            lineTranslateX + Math.round(lineWidth),
+            translateY + Math.round(fontSize / 2)
+          );
+
+          // I have no idea what is real ratio
+          // just /15 looks good enough
+          context.lineWidth = fontSize / 15;
+
+          const gradient = this._getLinearGradient();
+          context.strokeStyle = gradient || fill;
+          context.stroke();
+          context.restore();
+        }
+        if (shouldLineThrough) {
+          context.save();
+          context.beginPath();
+          context.moveTo(lineTranslateX, translateY);
+          spacesNumber = text.split(' ').length - 1;
+          oneWord = spacesNumber === 0;
+          lineWidth =
+            align === JUSTIFY && lastLine && !oneWord
+              ? totalWidth - padding * 2
+              : width;
+          context.lineTo(
+            lineTranslateX + Math.round(lineWidth),
+            translateY
+          );
+          context.lineWidth = fontSize / 15;
+          const gradient = this._getLinearGradient();
+          context.strokeStyle = gradient || fill;
+          context.stroke();
+          context.restore();
+        }
+        // As `letterSpacing` isn't supported on Safari, we use this polyfill.
+        // The exception is for RTL text, which we rely on native as it cannot
+        // be supported otherwise.
+        if (direction !== RTL && (letterSpacing !== 0 || align === JUSTIFY)) {
+          //   var words = text.split(' ');
+          spacesNumber = text.split(' ').length - 1;
+          var array = stringToArray(text);
+          for (var li = 0; li < array.length; li++) {
+            var letter = array[li];
+            // skip justify for the last line
+            if (letter === ' ' && !lastLine && align === JUSTIFY) {
+              lineTranslateX += (totalWidth - padding * 2 - width) / spacesNumber;
+              // context.translate(
+              //   Math.floor((totalWidth - padding * 2 - width) / spacesNumber),
+              //   0
+              // );
+            }
+            this._partialTextX = lineTranslateX;
+            this._partialTextY = translateY;
+            this._partialText = letter;
+            context.fillStrokeShape(this);
+            lineTranslateX += Konva.measureText(letter, fontSize, fontFamily, vertical).width + letterSpacing;
+          }
+        } else {
+          if (letterSpacing !== 0) {
+            context.setAttr('letterSpacing', `${letterSpacing}px`);
+          }
+          this._partialTextX = lineTranslateX;
+          this._partialTextY = translateY;
+          this._partialText = text;
+
+          context.fillStrokeShape(this);
+        }
+        context.restore();
+        if (textArrLen > 1) {
+          translateY += lineHeightPx;
+        }
       }
     }
   }
@@ -353,7 +424,7 @@ export class Text extends Shape<TextConfig> {
     this._setAttr(TEXT, str);
     return this;
   }
-  getWidth() {
+  getWidth(): number {
     var isAuto = this.attrs.width === AUTO || this.attrs.width === undefined;
     return isAuto ? this.getTextWidth() + this.padding() * 2 : this.attrs.width;
   }
@@ -380,29 +451,6 @@ export class Text extends Shape<TextConfig> {
     return this.textHeight;
   }
 
-  /**
-   * measure string with the font of current text shape.
-   * That method can't handle multiline text.
-   * @method
-   * @name Konva.Text#measureSize
-   * @param {String} [text] text to measure
-   * @returns {Object} { width , height} of measured text
-   */
-  measureSize(text) {
-    var _context = getDummyContext(),
-      fontSize = this.fontSize(),
-      metrics;
-
-    _context.save();
-    _context.font = this._getContextFont();
-
-    metrics = _context.measureText(text);
-    _context.restore();
-    return {
-      width: metrics.width,
-      height: fontSize,
-    };
-  }
   _getContextFont() {
     return (
       this.fontStyle() +
@@ -419,33 +467,29 @@ export class Text extends Shape<TextConfig> {
     if (align === JUSTIFY) {
       line = line.trim();
     }
-    var width = this._getTextWidth(line);
+    const size = Konva.measureText(line, this.fontSize(), this._getContextFont(), this.vertical());
     return this.textArr.push({
       text: line,
-      width: width,
+      width: size.width,
+      height: size.height,
       lastInParagraph: false,
     });
   }
-  _getTextWidth(text: string) {
-    var letterSpacing = this.letterSpacing();
-    var length = text.length;
-    return (
-      getDummyContext().measureText(text).width +
-      (length ? letterSpacing * (length - 1) : 0)
-    );
-  }
+
   _setTextData() {
     var lines = this.text().split('\n'),
       fontSize = +this.fontSize(),
+      fontFamily = this._getContextFont(),
       textWidth = 0,
       lineHeightPx = this.lineHeight() * fontSize,
-      width = this.attrs.width,
-      height = this.attrs.height,
+      width = this.attrs.width as number | 'auto' | undefined,
+      height = this.attrs.height as number | 'auto' | undefined,
+      vertical = this.vertical(),
       fixedWidth = width !== AUTO && width !== undefined,
       fixedHeight = height !== AUTO && height !== undefined,
       padding = this.padding(),
-      maxWidth = width - padding * 2,
-      maxHeightPx = height - padding * 2,
+      maxWidth = typeof width === 'number' ? width - padding * 2 : undefined,
+      maxHeightPx = typeof height === 'number' ?  height - padding * 2 : undefined,
       currentHeightPx = 0,
       wrap = this.wrap(),
       // align = this.align(),
@@ -454,122 +498,171 @@ export class Text extends Shape<TextConfig> {
       shouldAddEllipsis = this.ellipsis();
 
     this.textArr = [];
-    getDummyContext().font = this._getContextFont();
-    var additionalWidth = shouldAddEllipsis ? this._getTextWidth(ELLIPSIS) : 0;
-    for (var i = 0, max = lines.length; i < max; ++i) {
-      var line = lines[i];
+    var additionalWidth = shouldAddEllipsis 
+      ? Konva.measureText(ELLIPSIS, fontSize, fontFamily, vertical).width 
+      : 0;
 
-      var lineWidth = this._getTextWidth(line);
-      if (fixedWidth && lineWidth > maxWidth) {
-        /*
-         * if width is fixed and line does not fit entirely
-         * break the line into multiple fitting lines
-         */
-        while (line.length > 0) {
-          /*
-           * use binary search to find the longest substring that
-           * that would fit in the specified width
-           */
-          var low = 0,
-            high = line.length,
-            match = '',
-            matchWidth = 0;
-          while (low < high) {
-            var mid = (low + high) >>> 1,
-              substr = line.slice(0, mid + 1),
-              substrWidth = this._getTextWidth(substr) + additionalWidth;
-            if (substrWidth <= maxWidth) {
-              low = mid + 1;
-              match = substr;
-              matchWidth = substrWidth;
+    if (vertical) {
+      // 縦書きで高さが設定されていない場合は文字を表示しない
+      if (maxHeightPx) {
+        let w = 0;
+        for (const line of lines) {
+          if (!line) {
+            textWidth += fontSize;
+            this._addTextLine(line);
+            continue;
+          }
+          const textArr = stringToArray(line);
+          let h = 0;
+          let lineText = '';
+          for (const char of textArr) {
+            const size = Konva.measureText(char, fontSize, fontFamily, true);
+            if (Konva.VERTICAL_ROTATE_90.includes(char)
+              || Konva.VERTICAL_ROTATE_90_DOWN.includes(char) 
+              || Konva.VERTICAL_ROTATE_90_UP.includes(char)) {
+              w = Math.max(w, size.height);
+              h += size.width;
             } else {
-              high = mid;
+              w = Math.max(w, size.width);
+              h += size.height;
+            }
+            if (h > maxHeightPx) {
+              this._addTextLine(lineText);
+              lineText = char;
+              h = size.height;
+              textWidth += Math.max(w, fontSize);
+            } else {
+              lineText += char;
             }
           }
-          /*
-           * 'low' is now the index of the substring end
-           * 'match' is the substring
-           * 'matchWidth' is the substring width in px
-           */
-          if (match) {
-            // a fitting substring was found
-            if (wrapAtWord) {
-              // try to find a space or dash where wrapping could be done
-              var wrapIndex;
-              var nextChar = line[match.length];
-              var nextIsSpaceOrDash = nextChar === SPACE || nextChar === DASH;
-              if (nextIsSpaceOrDash && matchWidth <= maxWidth) {
-                wrapIndex = match.length;
-              } else {
-                wrapIndex =
-                  Math.max(match.lastIndexOf(SPACE), match.lastIndexOf(DASH)) +
-                  1;
-              }
-              if (wrapIndex > 0) {
-                // re-cut the substring found at the space/dash position
-                low = wrapIndex;
-                match = match.slice(0, low);
-                matchWidth = this._getTextWidth(match);
-              }
-            }
-            // if (align === 'right') {
-            match = match.trimRight();
-            // }
-            this._addTextLine(match);
-            textWidth = Math.max(textWidth, matchWidth);
-            currentHeightPx += lineHeightPx;
+          textWidth += w;
+          this._addTextLine(lineText);
+        }
+        // 幅に行間を追加する
+        textWidth += (this.textArr.length - 1) * VERTICAL_SPACING;
 
-            var shouldHandleEllipsis =
-              this._shouldHandleEllipsis(currentHeightPx);
-            if (shouldHandleEllipsis) {
-              this._tryToAddEllipsisToLastLine();
-              /*
-               * stop wrapping if wrapping is disabled or if adding
-               * one more line would overflow the fixed height
-               */
-              break;
+        this.textHeight = maxHeightPx;
+        this.textWidth = textWidth;
+      } else {
+        const sizes = lines.map((line) => Konva.measureText(line, fontSize, fontFamily, true));
+        this.textHeight = Math.max(...sizes.map((size) => size.height));
+        this.textWidth = sizes.reduce((prev, curr) => prev + curr.width, 0) + (lines.length - 1) * VERTICAL_SPACING;
+      }
+    } else {
+      for (var i = 0, max = lines.length; i < max; ++i) {
+        var line = lines[i];
+        var lineWidth = Konva.measureText(line, fontSize, fontFamily, false).width;
+        if (fixedWidth && maxWidth && lineWidth > maxWidth) {
+          /*
+          * if width is fixed and line does not fit entirely
+          * break the line into multiple fitting lines
+          */
+          while (line.length > 0) {
+            /*
+            * use binary search to find the longest substring that
+            * that would fit in the specified width
+            */
+            var low = 0,
+              high = line.length,
+              match = '',
+              matchWidth = 0;
+            while (low < high) {
+              var mid = (low + high) >>> 1,
+                substr = line.slice(0, mid + 1),
+                substrWidth = Konva.measureText(substr, fontSize, fontFamily, false).width + additionalWidth;
+              if (substrWidth <= maxWidth) {
+                low = mid + 1;
+                match = substr;
+                matchWidth = substrWidth;
+              } else {
+                high = mid;
+              }
             }
-            line = line.slice(low);
-            line = line.trimLeft();
-            if (line.length > 0) {
-              // Check if the remaining text would fit on one line
-              lineWidth = this._getTextWidth(line);
-              if (lineWidth <= maxWidth) {
-                // if it does, add the line and break out of the loop
-                this._addTextLine(line);
-                currentHeightPx += lineHeightPx;
-                textWidth = Math.max(textWidth, lineWidth);
+            /*
+            * 'low' is now the index of the substring end
+            * 'match' is the substring
+            * 'matchWidth' is the substring width in px
+            */
+            if (match) {
+              // a fitting substring was found
+              if (wrapAtWord) {
+                // try to find a space or dash where wrapping could be done
+                var wrapIndex;
+                var nextChar = line[match.length];
+                var nextIsSpaceOrDash = nextChar === SPACE || nextChar === DASH;
+                if (nextIsSpaceOrDash && matchWidth <= maxWidth) {
+                  wrapIndex = match.length;
+                } else {
+                  wrapIndex =
+                    Math.max(match.lastIndexOf(SPACE), match.lastIndexOf(DASH)) +
+                    1;
+                }
+                if (wrapIndex > 0) {
+                  // re-cut the substring found at the space/dash position
+                  low = wrapIndex;
+                  match = match.slice(0, low);
+                  matchWidth = Konva.measureText(match, fontSize, fontFamily, false).width;
+                }
+              }
+              // if (align === 'right') {
+              match = match.trimRight();
+              // }
+              this._addTextLine(match);
+              textWidth = Math.max(textWidth, matchWidth);
+              currentHeightPx += lineHeightPx;
+
+              var shouldHandleEllipsis =
+                this._shouldHandleEllipsis(currentHeightPx);
+              if (shouldHandleEllipsis) {
+                this._tryToAddEllipsisToLastLine();
+                /*
+                * stop wrapping if wrapping is disabled or if adding
+                * one more line would overflow the fixed height
+                */
                 break;
               }
+              line = line.slice(low);
+              line = line.trimLeft();
+              if (line.length > 0) {
+                // Check if the remaining text would fit on one line
+                lineWidth = Konva.measureText(line, fontSize, fontFamily, false).width;
+                if (lineWidth <= maxWidth) {
+                  // if it does, add the line and break out of the loop
+                  this._addTextLine(line);
+                  currentHeightPx += lineHeightPx;
+                  textWidth = Math.max(textWidth, lineWidth);
+                  break;
+                }
+              }
+            } else {
+              // not even one character could fit in the element, abort
+              break;
             }
-          } else {
-            // not even one character could fit in the element, abort
-            break;
+          }
+        } else {
+          // element width is automatically adjusted to max line width
+          this._addTextLine(line);
+          currentHeightPx += lineHeightPx;
+          textWidth = Math.max(textWidth, lineWidth);
+          if (this._shouldHandleEllipsis(currentHeightPx) && i < max - 1) {
+            this._tryToAddEllipsisToLastLine();
           }
         }
-      } else {
-        // element width is automatically adjusted to max line width
-        this._addTextLine(line);
-        currentHeightPx += lineHeightPx;
-        textWidth = Math.max(textWidth, lineWidth);
-        if (this._shouldHandleEllipsis(currentHeightPx) && i < max - 1) {
-          this._tryToAddEllipsisToLastLine();
+        // if element height is fixed, abort if adding one more line would overflow
+        if (this.textArr[this.textArr.length - 1]) {
+          this.textArr[this.textArr.length - 1].lastInParagraph = true;
+        }
+        if (fixedHeight && maxHeightPx && currentHeightPx + lineHeightPx > maxHeightPx) {
+          break;
         }
       }
-      // if element height is fixed, abort if adding one more line would overflow
-      if (this.textArr[this.textArr.length - 1]) {
-        this.textArr[this.textArr.length - 1].lastInParagraph = true;
-      }
-      if (fixedHeight && currentHeightPx + lineHeightPx > maxHeightPx) {
-        break;
-      }
+      this.textHeight = fontSize;
+      // var maxTextWidth = 0;
+      // for(var j = 0; j < this.textArr.length; j++) {
+      //     maxTextWidth = Math.max(maxTextWidth, this.textArr[j].width);
+      // }
+      this.textWidth = textWidth;
     }
-    this.textHeight = fontSize;
-    // var maxTextWidth = 0;
-    // for(var j = 0; j < this.textArr.length; j++) {
-    //     maxTextWidth = Math.max(maxTextWidth, this.textArr[j].width);
-    // }
-    this.textWidth = textWidth;
   }
 
   /**
@@ -608,7 +701,7 @@ export class Text extends Shape<TextConfig> {
     }
 
     if (fixedWidth) {
-      var haveSpace = this._getTextWidth(lastLine.text + ELLIPSIS) < maxWidth;
+      var haveSpace = Konva.measureText(lastLine.text + ELLIPSIS, this.fontSize(), this._getContextFont(), this.vertical()).width < maxWidth;
       if (!haveSpace) {
         lastLine.text = lastLine.text.slice(0, lastLine.text.length - 3);
       }
@@ -649,6 +742,7 @@ export class Text extends Shape<TextConfig> {
   text: GetSet<string, this>;
   wrap: GetSet<string, this>;
   ellipsis: GetSet<boolean, this>;
+  vertical: GetSet<boolean, this>;
 }
 
 Text.prototype._fillFunc = _fillFunc;
@@ -930,3 +1024,6 @@ Factory.addGetterSetter(Text, 'text', '', getStringValidator());
  */
 
 Factory.addGetterSetter(Text, 'textDecoration', '');
+
+
+Factory.addGetterSetter(Text, 'vertical', false, getBooleanValidator());
