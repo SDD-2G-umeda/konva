@@ -40,6 +40,7 @@ declare namespace Konva {
   export const isDragging: () => boolean;
   export const isDragReady: () => boolean;
   export const getAngle: (angle: number) => number;
+  export const measureText: (text: string, fontSize: number, fontFamily: string, vertical: boolean) => { width: number, height: number };
 
   export type Vector2d = import('./types').Vector2d;
 

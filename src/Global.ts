@@ -1,3 +1,5 @@
+import { Util } from "./Util";
+
 /*
  * Konva JavaScript Framework v@@version
  * http://konvajs.org/
@@ -10,6 +12,23 @@
  * @license
  */
 const PI_OVER_180 = Math.PI / 180;
+
+/** 縦書きで右上に移動する文字 */
+const VERTICAL_TOP_RIGHT = [
+'っ'
+];
+/** 縦書きで右上よりさらに奥に移動する文字 */
+const  VERTICAL_TOP_RIGHT_OVER = [
+'。',
+'、'
+];
+const  VERTICAL_ROTATE_90 = [
+' ', '　', '[', ']', '(', ')', '{', '}', '〈', '〉', '《', '》', '〔', '〕', '〚', '〛', '〘', '〙', '〖', '〗', '〝', '〞'
+];
+/** 縦書きで90度回転 */
+const VERTICAL_ROTATE_90_UP = ['「', '（', '『', '【'];
+/** 縦書きで90度回転 */
+const VERTICAL_ROTATE_90_DOWN = ['」', '）', '』', '】'];
 /**
  * @namespace Konva
  */
@@ -22,6 +41,85 @@ function detectBrowser() {
       // electron case
       {}.toString.call(window) === '[object global]')
   );
+}
+
+var dummyContext: CanvasRenderingContext2D,
+  CONTEXT_2D = '2d';
+  
+function getDummyContext() {
+  if (dummyContext) {
+    return dummyContext;
+  }
+  dummyContext = Util.createCanvasElement().getContext(
+    CONTEXT_2D
+  ) as CanvasRenderingContext2D;
+  return dummyContext;
+}
+
+const textHorizontalSizes: { [fontSize: number]: { [char: string]: { width: number, height: number } } } = {};
+const textVerticalSizes: { [fontSize: number]: { [char: string]: { width: number, height: number } } } = {};
+
+/**
+ * 文字の大きさを取得する
+ * @param text 計測する文字
+ * @param fontSize フォントサイズ
+ * @param font this._getContextFont()で取得したもの
+ * @param vertical 縦書きの場合はtrue
+ */
+function measureText(text: string, fontSize: number, font: string, vertical: boolean) {
+  // 空文字の場合はフォントサイズで決め打ちする
+  if (!text) {
+    return vertical 
+    ? { width: fontSize, height: 0 }
+    : { width: 0, height: fontSize };
+  }
+
+  if (!textHorizontalSizes[fontSize]) {
+    textHorizontalSizes[fontSize] = {};
+    textVerticalSizes[fontSize] = {};
+  }
+  
+  let size = vertical 
+    ? textVerticalSizes[fontSize][text] 
+    : textHorizontalSizes[fontSize][text];
+  if (size) {
+    return size;
+  }
+  const _context = getDummyContext();
+
+  _context.save();
+  _context.font = font;
+
+  if (vertical) {
+    let h = 0;
+    let maxWidth = 0;
+    for (const char of text) { 
+      const metrics = _context.measureText(char);
+      if (VERTICAL_ROTATE_90.includes(char)
+      || VERTICAL_ROTATE_90_DOWN.includes(char) 
+      || VERTICAL_ROTATE_90_UP.includes(char)) {
+        size = { width: fontSize, height: metrics.width };
+        h += metrics.width;
+      } else {
+        size = { width: metrics.width, height: fontSize };
+        h += fontSize;
+      }
+      maxWidth = Math.max(maxWidth, size.width);
+      // Note: 1文字の場合は横向きに保存する
+      textHorizontalSizes[fontSize][char] = size;
+    }
+    size = { width: maxWidth, height: h };
+    textVerticalSizes[fontSize][text] = size;
+  } else {
+    const metrics = _context.measureText(text);
+    size = {
+      width: metrics.width,
+      height: fontSize,
+    };
+    textHorizontalSizes[fontSize][text] = size;
+  }
+  _context.restore();
+  return size;
 }
 
 declare const WorkerGlobalScope: any;
@@ -44,6 +142,13 @@ export const Konva = {
   getAngle(angle: number) {
     return Konva.angleDeg ? angle * PI_OVER_180 : angle;
   },
+  VERTICAL_TOP_RIGHT,
+  VERTICAL_TOP_RIGHT_OVER,
+  VERTICAL_ROTATE_90,
+  VERTICAL_ROTATE_90_UP,
+  VERTICAL_ROTATE_90_DOWN,
+  measureText,
+  getDummyContext,
   enableTrace: false,
   pointerEventsEnabled: true,
   /**
