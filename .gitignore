@@ -12,7 +12,7 @@ homedocs
 jsdoc-template
 api
 package-lock.json
-#lib
+lib
 src_old
 *.zip
 *_cache
