@@ -21,25 +21,41 @@ const VERTICAL_TOP_RIGHT = [
 ];
 /** 縦書きで右上よりさらに奥に移動する文字 */
 const  VERTICAL_TOP_RIGHT_OVER = [
- '。', '、'
+  '。', '、'
 ];
+
+/** 単純に90度回転する文字 */
+const VERTICAL_ROTATE = [
+  'ー', '〝',  '〟'
+]
 /** 縦書きで90回転する約物（おそらく半角の場合にちょうど良い） */
-const  VERTICAL_ROTATE_90 = [
- ' ', '　', '[', ']', '(', ')', '{', '}', '〈', '〉', '‘', '“', 
- '｢', '｣'/** 半角カタカナ */, '『', '』'/** 半角カタカナ */
+const VERTICAL_ROTATE_90_HALF = [
+  ' ', '　', '[', ']', '(', ')', '{', '}', '｢', '｣'
 ];
 /** 縦書きで90回転する約物（回転した後に少し上に移動する） */
 const VERTICAL_ROTATE_90_UP = [
-  '「', '『', '【', '《', '〔', '〚', '〘', '〖', '〝', '［',
-  '（' /** ひらがな */, '（' /** カタカナ */, '（' /** 全角英数 */,
-  '『'/** ひらがな */, '『'/** カタカナ */, '｛'/** 全角英数 */
+  '「', '『', '【', '《', '〔', '〚', '〘', '〖', '［',
+  '（', '『', '｛', '〈'
 ];
 /** 縦書きで90回転する約物（回転した後に少し下に移動する） */
 const VERTICAL_ROTATE_90_DOWN = [
   '」', '』', '】', '》', '〕', '〛', '〙', '〗', '〞', '］',
-  '）' /** ひらがな */, '）' /** カタカナ */, '）' /** 全角英数 */,
-  '』'/** ひらがな */, '』'/** カタカナ */, '｝'/** 全角英数 */
+  '）', '』', '｝', '〉'
 ];
+const VERTICAL_ROTATE_90_QUOT_HALF = [
+  '‘', '’', '‵', '′', '‶', '"'
+]
+const VERTICAL_ROTATE_90_QUOT_HALF_UP = [
+  '\''
+]
+/**
+ * 縦横でコンバートする文字
+ * [横], [縦]
+ */
+const VERTICAL_TRANSLATE = [
+  ['“', '”'],
+  ['〝',  '〟']
+]
 /**
  * @namespace Konva
  */
@@ -104,20 +120,24 @@ function measureText(text: string, fontSize: number, font: string, vertical: boo
   if (vertical) {
     let h = 0;
     let maxWidth = 0;
-    for (const char of text) { 
-      const metrics = _context.measureText(char);
-      if (VERTICAL_ROTATE_90.includes(char)
-      || VERTICAL_ROTATE_90_DOWN.includes(char) 
-      || VERTICAL_ROTATE_90_UP.includes(char)) {
+    for (const char of text) {
+      const index = VERTICAL_TRANSLATE[0].indexOf(char);
+      const c = index >= 0 ? VERTICAL_TRANSLATE[1][index] : char;
+      const metrics = _context.measureText(c);
+      if (VERTICAL_ROTATE.includes(c)
+        || VERTICAL_ROTATE_90_HALF.includes(c)
+        || VERTICAL_ROTATE_90_DOWN.includes(c) 
+        || VERTICAL_ROTATE_90_UP.includes(c)
+        || VERTICAL_ROTATE_90_QUOT_HALF.includes(c)
+        || VERTICAL_ROTATE_90_QUOT_HALF_UP.includes(c)) {
         size = { width: fontSize, height: metrics.width };
-        h += metrics.width;
+        h += size.height;
       } else {
         size = { width: metrics.width, height: fontSize };
         h += fontSize;
       }
       maxWidth = Math.max(maxWidth, size.width);
-      // Note: 1文字の場合は横向きに保存する
-      textHorizontalSizes[fontSize][char] = size;
+      textVerticalSizes[fontSize][c] = size;
     }
     size = { width: maxWidth, height: h };
     textVerticalSizes[fontSize][text] = size;
@@ -155,9 +175,13 @@ export const Konva = {
   },
   VERTICAL_TOP_RIGHT,
   VERTICAL_TOP_RIGHT_OVER,
-  VERTICAL_ROTATE_90,
+  VERTICAL_ROTATE,
+  VERTICAL_ROTATE_90_HALF,
   VERTICAL_ROTATE_90_UP,
   VERTICAL_ROTATE_90_DOWN,
+  VERTICAL_ROTATE_90_QUOT_HALF,
+  VERTICAL_ROTATE_90_QUOT_HALF_UP,
+  VERTICAL_TRANSLATE,
   measureText,
   getDummyContext,
   enableTrace: false,

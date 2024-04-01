@@ -249,30 +249,47 @@ export class Text extends Shape<TextConfig> {
           lineTranslateX -= VERTICAL_SPACING
         }
         for (var char of text) {
+          // 縦書き用の描画用文字変換
+          const index = Konva.VERTICAL_TRANSLATE[0].indexOf(char);
+          const c = index >= 0 ? Konva.VERTICAL_TRANSLATE[1][index] : char;
+
           // Note: l などの細い文字を中央寄せにする
-          const size = Konva.measureText(char, fontSize, fontFamily, vertical);
+          const size = Konva.measureText(c, fontSize, fontFamily, vertical);
           const diffX = (width - size.width) / 2;
 
-          this._partialText = char;
-          const isRotate = Konva.VERTICAL_ROTATE_90.includes(char);
-          const isRotateUp =  Konva.VERTICAL_ROTATE_90_UP.includes(char);
-          const isRotateDown =  Konva.VERTICAL_ROTATE_90_DOWN.includes(char);
-          if (isRotate || isRotateUp || isRotateDown) {
+          this._partialText = c;
+          // 処理を少しでも軽くするために、すでに見つかっていたら後続のフラグは見ないようにする
+          const isRotate = Konva.VERTICAL_ROTATE.includes(c);
+          const isRotateHalf = Konva.VERTICAL_ROTATE_90_HALF.includes(c);
+          const isRotateUp = !isRotateHalf && Konva.VERTICAL_ROTATE_90_UP.includes(c);
+          const isRotateDown = !isRotateUp && Konva.VERTICAL_ROTATE_90_DOWN.includes(c);
+          const isRotateQuotHalf = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF.includes(c);
+          const isRotateQuotHalfUp = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF_UP.includes(c);
+          if (isRotate || isRotateHalf || isRotateUp || isRotateDown || isRotateQuotHalf || isRotateQuotHalfUp) {
             this._partialTextX = 0;
             this._partialTextY = 0;
             let rotateDiffX: number;
             let rotateDiffY: number;
             if (isRotate) {
-              // Note: [] などが半角の場合に元々下にずれているが、
-              // 回転させることでさらにズレが目立つようになるので 0.65 に調整している
-              rotateDiffX = size.width * 0.65
+              rotateDiffX = size.width * 0.5
               rotateDiffY = size.height * 0.5
+            } else if (isRotateHalf) {
+              // Note: [] などが半角の場合に元々下にずれているが、
+              // 回転させることでさらにズレが目立つようになるので 0.58 に調整している
+              rotateDiffX = size.width * 0.58
+              rotateDiffY = size.height * 1.45
             } else if (isRotateUp) {
               rotateDiffX = size.width * 0.5
               rotateDiffY = size.height * 0.65
-            } else {
+            } else if (isRotateDown) {
               rotateDiffX = size.width * 0.5
               rotateDiffY = size.height * 0.35
+            } else if (isRotateQuotHalf) {
+              rotateDiffX = size.width * 0.5
+              rotateDiffY = size.height
+            } else {
+              rotateDiffX = size.width * 0.5
+              rotateDiffY = size.height * 1.65
             }
             context.save();
             context.translate(lineTranslateX + diffX + rotateDiffX, translateY - rotateDiffY)
@@ -282,10 +299,10 @@ export class Text extends Shape<TextConfig> {
             // 回転した分戻す
             context.restore();
           } else {
-            if ( Konva.VERTICAL_TOP_RIGHT.includes(char)) {
+            if (Konva.VERTICAL_TOP_RIGHT.includes(c)) {
               this._partialTextX = lineTranslateX + diffX + size.width / 8;
               this._partialTextY = translateY - size.height / 8;
-            } else if ( Konva.VERTICAL_TOP_RIGHT_OVER.includes(char)) {
+            } else if (Konva.VERTICAL_TOP_RIGHT_OVER.includes(c)) {
               this._partialTextX = lineTranslateX + diffX + size.width * 0.65;
               this._partialTextY = translateY - size.height / 2;
             }  else {
@@ -498,9 +515,6 @@ export class Text extends Shape<TextConfig> {
       shouldAddEllipsis = this.ellipsis();
 
     this.textArr = [];
-    var additionalWidth = shouldAddEllipsis 
-      ? Konva.measureText(ELLIPSIS, fontSize, fontFamily, vertical).width 
-      : 0;
 
     if (vertical) {
       // 縦書きで高さが設定されていない場合は文字を表示しない
@@ -517,15 +531,8 @@ export class Text extends Shape<TextConfig> {
           let lineText = '';
           for (const char of textArr) {
             const size = Konva.measureText(char, fontSize, fontFamily, true);
-            if (Konva.VERTICAL_ROTATE_90.includes(char)
-              || Konva.VERTICAL_ROTATE_90_DOWN.includes(char) 
-              || Konva.VERTICAL_ROTATE_90_UP.includes(char)) {
-              w = Math.max(w, size.height);
-              h += size.width;
-            } else {
-              w = Math.max(w, size.width);
-              h += size.height;
-            }
+            w = Math.max(w, size.width);
+            h += size.height;
             if (h > maxHeightPx) {
               this._addTextLine(lineText);
               lineText = char;
@@ -549,6 +556,9 @@ export class Text extends Shape<TextConfig> {
         this.textWidth = sizes.reduce((prev, curr) => prev + curr.width, 0) + (lines.length - 1) * VERTICAL_SPACING;
       }
     } else {
+      var additionalWidth = shouldAddEllipsis 
+        ? Konva.measureText(ELLIPSIS, fontSize, fontFamily, vertical).width 
+        : 0;
       for (var i = 0, max = lines.length; i < max; ++i) {
         var line = lines[i];
         var lineWidth = Konva.measureText(line, fontSize, fontFamily, false).width;
