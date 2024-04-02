@@ -27,16 +27,17 @@ const VERTICAL_TOP_RIGHT = [
  * 縦書きで右上よりさらに奥に移動する
  */
 const VERTICAL_JPN_PERIOD = [
-  '。', '、'
+  '。', '、', '｡', '､'
 ];
 
 /** 単純に90度回転する文字 */
-const VERTICAL_ROTATE = [
-  'ー', '〝',  '〟'
+const VERTICAL_JPN_ROTATE = [
+  'ー', '〝',  '〟', '〰', '〜', '～', '：', '；', '＜', '＞', '∿', '∾', '∿'
 ]
 /** 縦書きで90回転する約物（おそらく半角の場合にちょうど良い） */
 const VERTICAL_ROTATE_90_HALF = [
-  ' ', '　', '[', ']', '(', ')', '{', '}', '｢', '｣'
+  ' ', '　', '[', ']', '(', ')', '{', '}', '｢', '｣', '-', '･', '·', '·', 'ｰ',
+  '∼'
 ];
 /** 
  * 日本語の約物
@@ -62,17 +63,43 @@ const VERTICAL_ROTATE_90_QUOT_HALF = [
  * 縦書きで回転するクォーテーション
  * そのまま回転すると文字に重なるため上に移動する
  */
-const VERTICAL_ROTATE_90_QUOT_HALF_UP = [
+const VERTICAL_ROTATE_90_HALF_UP = [
   '\''
+]
+/** 
+ * 縦書きで回転するクォーテーション
+ * そのまま回転すると文字に重なるため下に移動する
+ */
+const VERTICAL_ROTATE_90_HALF_DOWN = [
+  '<', '>', '~'
+]
+/** 
+ * 縦書きで回転するクォーテーション
+ * そのまま回転すると文字に重なるため右上に移動する
+ */
+const VERTICAL_ROTATE_90_HALF_UP_RIGHT = [
+  ':', ';'
 ]
 /**
  * 縦横でコンバートする文字
  * [横], [縦]
  */
 const VERTICAL_TRANSLATE = [
-  ['“', '”'],
-  ['〝',  '〟']
+  ['“', '”', '…', '︙', '‥', '︰'],
+  ['〝',  '〟', '︙', '…', '︰', '‥']
 ]
+
+/** 90度回転する文字を統合した配列 */
+const VERTICAL_ROTATE_90 = 
+  VERTICAL_JPN_ROTATE
+  .concat(VERTICAL_ROTATE_90_HALF)
+  .concat(VERTICAL_JPN_BRACKET_START_FULL)
+  .concat(VERTICAL_JPN_BRACKET_END_FULL)
+  .concat(VERTICAL_ROTATE_90_QUOT_HALF)
+  .concat(VERTICAL_ROTATE_90_HALF_UP)
+  .concat(VERTICAL_ROTATE_90_HALF_UP_RIGHT)
+  .concat(VERTICAL_ROTATE_90_HALF_DOWN)
+
 /**
  * @namespace Konva
  */
@@ -143,12 +170,7 @@ function measureText(text: string, fontSize: number, font: string, vertical: boo
       const index = VERTICAL_TRANSLATE[0].indexOf(char);
       const c = index >= 0 ? VERTICAL_TRANSLATE[1][index] : char;
       const metrics = _context.measureText(c);
-      if (VERTICAL_ROTATE.includes(c)
-        || VERTICAL_ROTATE_90_HALF.includes(c)
-        || VERTICAL_JPN_BRACKET_END_FULL.includes(c) 
-        || VERTICAL_JPN_BRACKET_START_FULL.includes(c)
-        || VERTICAL_ROTATE_90_QUOT_HALF.includes(c)
-        || VERTICAL_ROTATE_90_QUOT_HALF_UP.includes(c)) {
+      if (VERTICAL_ROTATE_90.includes(c)) {
         size = { width: fontSize, height: metrics.width };
       } else {
         size = { width: metrics.width, height: fontSize };
@@ -158,7 +180,7 @@ function measureText(text: string, fontSize: number, font: string, vertical: boo
         && VERTICAL_JPN_BRACKET_END_FULL.includes(text[i + 1])) {
         h += size.height / 2;
       } else if (i === text.length - 1
-        && (VERTICAL_JPN_PERIOD.includes(c) || VERTICAL_JPN_BRACKET_END_FULL.includes(c))) {
+        && (VERTICAL_JPN_PERIOD.includes(c) || VERTICAL_JPN_BRACKET_END_FULL.includes(char))) {
         // 最後の文字が読点か括弧閉じの場合は高さを半分にする
         h += size.height / 2;
       } else {
@@ -204,12 +226,14 @@ export const Konva = {
   VERTICAL_MOVE_UP,
   VERTICAL_TOP_RIGHT,
   VERTICAL_JPN_PERIOD,
-  VERTICAL_ROTATE,
+  VERTICAL_JPN_ROTATE,
   VERTICAL_ROTATE_90_HALF,
   VERTICAL_JPN_BRACKET_START_FULL,
   VERTICAL_JPN_BRACKET_END_FULL,
   VERTICAL_ROTATE_90_QUOT_HALF,
-  VERTICAL_ROTATE_90_QUOT_HALF_UP,
+  VERTICAL_ROTATE_90_HALF_UP,
+  VERTICAL_ROTATE_90_HALF_UP_RIGHT,
+  VERTICAL_ROTATE_90_HALF_DOWN,
   VERTICAL_TRANSLATE,
   measureText,
   getDummyContext,

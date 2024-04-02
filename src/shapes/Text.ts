@@ -260,13 +260,16 @@ export class Text extends Shape<TextConfig> {
 
           this._partialText = c;
           // 処理を少しでも軽くするために、すでに見つかっていたら後続のフラグは見ないようにする
-          const isRotate = Konva.VERTICAL_ROTATE.includes(c);
+          const isRotate = Konva.VERTICAL_JPN_ROTATE.includes(c);
           const isRotateHalf = Konva.VERTICAL_ROTATE_90_HALF.includes(c);
           const isRotateUp = !isRotateHalf && Konva.VERTICAL_JPN_BRACKET_START_FULL.includes(c);
           const isRotateDown = !isRotateUp && Konva.VERTICAL_JPN_BRACKET_END_FULL.includes(c);
           const isRotateQuotHalf = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF.includes(c);
-          const isRotateQuotHalfUp = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF_UP.includes(c);
-          if (isRotate || isRotateHalf || isRotateUp || isRotateDown || isRotateQuotHalf || isRotateQuotHalfUp) {
+          const isRotateHalfUp = !isRotateQuotHalf && Konva.VERTICAL_ROTATE_90_HALF_UP.includes(c);
+          const isRotateHalfUpRight = !isRotateHalfUp && Konva.VERTICAL_ROTATE_90_HALF_UP_RIGHT.includes(c);
+          const isRotateHalfDown = !isRotateHalfUpRight && Konva.VERTICAL_ROTATE_90_HALF_DOWN.includes(c);
+          
+          if (isRotate || isRotateHalf || isRotateUp || isRotateDown || isRotateQuotHalf || isRotateHalfUp || isRotateHalfUpRight || isRotateHalfDown) {
             this._partialTextX = 0;
             this._partialTextY = 0;
             let rotateDiffX: number;
@@ -288,9 +291,15 @@ export class Text extends Shape<TextConfig> {
             } else if (isRotateQuotHalf) {
               rotateDiffX = size.width * 0.5
               rotateDiffY = size.height
-            } else {
+            } else if (isRotateHalfUp) {
               rotateDiffX = size.width * 0.5
               rotateDiffY = size.height * 1.65
+            } else if (isRotateHalfUpRight) {
+              rotateDiffX = size.width * 0.62
+              rotateDiffY = size.height * 1.65
+            } else {
+              rotateDiffX = size.width * 0.5
+              rotateDiffY = size.height * 0.95
             }
             context.save();
             context.translate(lineTranslateX + diffX + rotateDiffX, translateY - rotateDiffY)
