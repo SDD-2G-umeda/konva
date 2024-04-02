@@ -248,8 +248,9 @@ export class Text extends Shape<TextConfig> {
         if (n !== 0) {
           lineTranslateX -= VERTICAL_SPACING
         }
-        for (var char of text) {
+        for (let i = 0; i < text.length; i += 1) {
           // 縦書き用の描画用文字変換
+          const char = text[i];
           const index = Konva.VERTICAL_TRANSLATE[0].indexOf(char);
           const c = index >= 0 ? Konva.VERTICAL_TRANSLATE[1][index] : char;
 
@@ -261,8 +262,8 @@ export class Text extends Shape<TextConfig> {
           // 処理を少しでも軽くするために、すでに見つかっていたら後続のフラグは見ないようにする
           const isRotate = Konva.VERTICAL_ROTATE.includes(c);
           const isRotateHalf = Konva.VERTICAL_ROTATE_90_HALF.includes(c);
-          const isRotateUp = !isRotateHalf && Konva.VERTICAL_ROTATE_90_UP.includes(c);
-          const isRotateDown = !isRotateUp && Konva.VERTICAL_ROTATE_90_DOWN.includes(c);
+          const isRotateUp = !isRotateHalf && Konva.VERTICAL_JPN_BRACKET_START_FULL.includes(c);
+          const isRotateDown = !isRotateUp && Konva.VERTICAL_JPN_BRACKET_END_FULL.includes(c);
           const isRotateQuotHalf = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF.includes(c);
           const isRotateQuotHalfUp = !isRotateDown && Konva.VERTICAL_ROTATE_90_QUOT_HALF_UP.includes(c);
           if (isRotate || isRotateHalf || isRotateUp || isRotateDown || isRotateQuotHalf || isRotateQuotHalfUp) {
@@ -302,7 +303,7 @@ export class Text extends Shape<TextConfig> {
             if (Konva.VERTICAL_TOP_RIGHT.includes(c)) {
               this._partialTextX = lineTranslateX + diffX + size.width / 8;
               this._partialTextY = translateY - size.height / 8;
-            } else if (Konva.VERTICAL_TOP_RIGHT_OVER.includes(c)) {
+            } else if (Konva.VERTICAL_JPN_PERIOD.includes(c)) {
               this._partialTextX = lineTranslateX + diffX + size.width * 0.65;
               this._partialTextY = translateY - size.height / 2;
             } else if (Konva.VERTICAL_MOVE_UP.includes(c)) {
@@ -314,7 +315,13 @@ export class Text extends Shape<TextConfig> {
             }
             context.fillStrokeShape(this);
           }
-          translateY += size.height;
+          // 読点の後に全角の括弧閉じが続く場合は高さを半分にする
+          if (Konva.VERTICAL_JPN_PERIOD.includes(c)
+            && Konva.VERTICAL_JPN_BRACKET_END_FULL.includes(text[i + 1])) {
+            translateY += size.height / 2;
+          } else {
+            translateY += size.height;
+          }
         }
         context.restore();
 
@@ -498,7 +505,7 @@ export class Text extends Shape<TextConfig> {
 
   _setTextData() {
     var lines = this.text().split('\n'),
-      fontSize = +this.fontSize(),
+      fontSize = this.fontSize(),
       fontFamily = this._getContextFont(),
       textWidth = 0,
       lineHeightPx = this.lineHeight() * fontSize,
@@ -533,13 +540,11 @@ export class Text extends Shape<TextConfig> {
           let h = 0;
           let lineText = '';
           for (const char of textArr) {
-            const size = Konva.measureText(char, fontSize, fontFamily, true);
+            const size = Konva.measureText(lineText + char, fontSize, fontFamily, true);
             w = Math.max(w, size.width);
-            h += size.height;
-            if (h > maxHeightPx) {
+            if (size.height > maxHeightPx) {
               this._addTextLine(lineText);
               lineText = char;
-              h = size.height;
               textWidth += Math.max(w, fontSize);
             } else {
               lineText += char;
@@ -838,8 +843,10 @@ Factory.addGetterSetter(Text, 'direction', INHERIT);
  *
  * // set font family
  * text.fontFamily('Arial');
+ * Note: 文字->文字サイズ->フォントで適用される
+ * 適用の度にサイズの計測が入るため、処理軽減のため最初からデフォルトのフォントを設定しておく
  */
-Factory.addGetterSetter(Text, 'fontFamily', 'Arial');
+Factory.addGetterSetter(Text, 'fontFamily', '\"Noto Sans JP\", sans-serif');
 
 /**
  * get/set font size in pixels
@@ -854,7 +861,7 @@ Factory.addGetterSetter(Text, 'fontFamily', 'Arial');
  * // set font size to 22px
  * text.fontSize(22);
  */
-Factory.addGetterSetter(Text, 'fontSize', 12, getNumberValidator());
+Factory.addGetterSetter(Text, 'fontSize', 22, getNumberValidator());
 
 /**
  * get/set font style.  Can be 'normal', 'italic', or 'bold', '500' or even 'italic bold'.  'normal' is the default.
