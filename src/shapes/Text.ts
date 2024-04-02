@@ -545,7 +545,7 @@ export class Text extends Shape<TextConfig> {
               lineText += char;
             }
           }
-          textWidth += w;
+          textWidth += Math.max(w, fontSize);
           this._addTextLine(lineText);
         }
         // 幅に行間を追加する
