@@ -12,7 +12,10 @@ import { Util } from "./Util";
  * @license
  */
 const PI_OVER_180 = Math.PI / 180;
-
+/** 縦書きで少し上に移動する文字（下が伸びている文字に対応する） */
+const VERTICAL_MOVE_UP = [
+  'g', 'j', 'p', 'q', 'y', 'ｇ', 'ｊ', 'ｐ', 'ｑ', 'ｙ'
+]
 /** 縦書きで右上に移動する文字（捨て仮名） */
 const VERTICAL_TOP_RIGHT = [
  'っ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'ゃ', 'ゅ', 'ょ', 'ゎ', 'ゕ', 'ゖ', 'ァ', 'ィ', 'ゥ',
@@ -173,6 +176,7 @@ export const Konva = {
   getAngle(angle: number) {
     return Konva.angleDeg ? angle * PI_OVER_180 : angle;
   },
+  VERTICAL_MOVE_UP,
   VERTICAL_TOP_RIGHT,
   VERTICAL_TOP_RIGHT_OVER,
   VERTICAL_ROTATE,

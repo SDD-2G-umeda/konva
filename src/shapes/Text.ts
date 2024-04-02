@@ -305,6 +305,9 @@ export class Text extends Shape<TextConfig> {
             } else if (Konva.VERTICAL_TOP_RIGHT_OVER.includes(c)) {
               this._partialTextX = lineTranslateX + diffX + size.width * 0.65;
               this._partialTextY = translateY - size.height / 2;
+            } else if (Konva.VERTICAL_MOVE_UP.includes(c)) {
+              this._partialTextX = lineTranslateX + diffX;
+              this._partialTextY = translateY - size.height * 0.20;
             }  else {
               this._partialTextX = lineTranslateX + diffX;
               this._partialTextY = translateY;
