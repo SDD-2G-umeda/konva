@@ -32,7 +32,8 @@ const VERTICAL_JPN_PERIOD = [
 
 /** 単純に90度回転する文字 */
 const VERTICAL_JPN_ROTATE = [
-  'ー', '〝',  '〟', '〰', '〜', '～', '：', '；', '＜', '＞', '∿', '∾', '∿', '￣', '＿', '＝'
+  'ー', '〝',  '〟', '〰', '〜', '～', '：', '；', '＜', '＞', '∿', '∾', '∿', '￣', '＿',
+  '＝', '≪', '≫'
 ]
 /** 縦書きで90回転する約物（おそらく半角の場合にちょうど良い） */
 const VERTICAL_ROTATE_90_HALF = [
@@ -50,6 +51,7 @@ const VERTICAL_JPN_BRACKET_START_FULL = [
 /** 
  * 日本語の約物
  * 縦書きで90回転する（回転した後に少し下に移動する）
+ * Note: ここに記載した文字は読点の後に続く場合に高さを半分で計算する
  */
 const VERTICAL_JPN_BRACKET_END_FULL = [
   '」', '』', '】', '》', '〕', '〛', '〙', '〗', '〞', '］',
@@ -57,14 +59,14 @@ const VERTICAL_JPN_BRACKET_END_FULL = [
 ];
 /** 縦書きで回転するクォーテーション */
 const VERTICAL_ROTATE_90_QUOT_HALF = [
-  '‘', '’', '‵', '′', '‶', '"'
+  '‵', '′', '‶', '"'
 ]
 /** 
  * 縦書きで回転するクォーテーション
  * そのまま回転すると文字に重なるため上に移動する
  */
 const VERTICAL_ROTATE_90_HALF_UP = [
-  '\''
+  '\'', '‘', '’'
 ]
 /** 
  * 縦書きで回転するクォーテーション
@@ -87,6 +89,13 @@ const VERTICAL_ROTATE_90_HALF_UP_RIGHT = [
 const VERTICAL_TRANSLATE = [
   ['“', '”', '…', '︙', '‥', '︰', '│', '─', '｜'],
   ['〝',  '〟', '︙', '…', '︰', '‥', '─', '│', '─']
+]
+/**
+ * 濁点、半濁点
+ * Note: これらの文字はサイズが 0x0 になる
+ */
+const VERTICAL_JPN_ORTHOGRAPHY = [
+  'ﾞ', 'ﾟ'
 ]
 
 /** 90度回転する文字を統合した配列 */
@@ -166,6 +175,9 @@ function measureText(text: string, fontSize: number, font: string, vertical: boo
     let maxWidth = 0;
     for (let i = 0; i < text.length; i += 1) {
       const char = text[i];
+      if (VERTICAL_JPN_ORTHOGRAPHY.includes(char)) {
+        continue;
+      }
       // 変換文字対象の文字かチェックする
       const index = VERTICAL_TRANSLATE[0].indexOf(char);
       const c = index >= 0 ? VERTICAL_TRANSLATE[1][index] : char;
@@ -230,6 +242,7 @@ export const Konva = {
   VERTICAL_ROTATE_90_HALF,
   VERTICAL_JPN_BRACKET_START_FULL,
   VERTICAL_JPN_BRACKET_END_FULL,
+  VERTICAL_JPN_ORTHOGRAPHY,
   VERTICAL_ROTATE_90_QUOT_HALF,
   VERTICAL_ROTATE_90_HALF_UP,
   VERTICAL_ROTATE_90_HALF_UP_RIGHT,

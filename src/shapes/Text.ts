@@ -318,7 +318,17 @@ export class Text extends Shape<TextConfig> {
             } else if (Konva.VERTICAL_MOVE_UP.includes(c)) {
               this._partialTextX = lineTranslateX + diffX;
               this._partialTextY = translateY - size.height * 0.20;
-            }  else {
+            } else if (Konva.VERTICAL_JPN_ORTHOGRAPHY.includes(c)) {
+              // 濁点、半濁点は前の文字に重ねる
+              // 前の文字の右上に表示する
+              const prevSize = Konva.measureText(text[i - 1], fontSize, fontFamily, vertical);
+              // Note: 濁点、半濁点のサイズは 0x0 となるので、diffX は前の文字のサイズを使う
+              // 表示位置は前の文字の右端の上に表示する
+              this._partialTextX = lineTranslateX + (width - prevSize.width) / 2 + prevSize.width;
+              this._partialTextY = translateY - prevSize.height;
+              // 高さを加算しないようにする
+              size.height = 0;
+            } else {
               this._partialTextX = lineTranslateX + diffX;
               this._partialTextY = translateY;
             }
