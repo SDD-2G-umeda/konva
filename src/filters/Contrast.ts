@@ -1,6 +1,7 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { getNumberValidator } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { getNumberValidator } from '../Validators.ts';
 /**
  * Contrast Filter.
  * @function
@@ -13,16 +14,15 @@ import { getNumberValidator } from '../Validators';
  */
 
 export const Contrast: Filter = function (imageData) {
-  var adjust = Math.pow((this.contrast() + 100) / 100, 2);
+  const adjust = Math.pow((this.contrast() + 100) / 100, 2);
 
-  var data = imageData.data,
-    nPixels = data.length,
-    red = 150,
+  const data = imageData.data,
+    nPixels = data.length;
+  let red = 150,
     green = 150,
-    blue = 150,
-    i;
+    blue = 150;
 
-  for (i = 0; i < nPixels; i += 4) {
+  for (let i = 0; i < nPixels; i += 4) {
     red = data[i];
     green = data[i + 1];
     blue = data[i + 2];

@@ -3,12 +3,12 @@ import { assert } from 'chai';
 import {
   addStage,
   Konva,
-  createCanvas,
   compareLayerAndCanvas,
   loadImage,
   isNode,
   isBrowser,
-} from './test-utils';
+  createCanvasAndContext,
+} from './test-utils.ts';
 
 describe('Image', function () {
   // ======================================================
@@ -107,17 +107,10 @@ describe('Image', function () {
 
       var trace = layer.getContext().getTrace();
 
-      if (isBrowser) {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,100,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,200,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,100,100);restore();'
-        );
-      } else {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object Object],135,7,167,134,0,0,100,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object Object],135,7,167,134,0,0,200,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object Object],135,7,167,134,0,0,100,100);restore();'
-        );
-      }
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,100,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,200,100);restore();clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);drawImage([object HTMLImageElement],135,7,167,134,0,0,100,100);restore();'
+      );
 
       done();
     });
@@ -241,17 +234,10 @@ describe('Image', function () {
 
       var trace = layer.getContext().getTrace();
 
-      if (isBrowser) {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);globalAlpha=0.5;shadowColor=rgba(0,0,0,0.1);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;drawImage([object HTMLImageElement],0,0,100,100);restore();'
-        );
-      } else {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);globalAlpha=0.5;shadowColor=rgba(0,0,0,0.1);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;drawImage([object Object],0,0,100,100);restore();'
-        );
-      }
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,150,30);globalAlpha=0.5;shadowColor=rgba(0,0,0,0.1);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;drawImage([object HTMLImageElement],0,0,100,100);restore();'
+      );
 
       done();
     });
@@ -285,17 +271,10 @@ describe('Image', function () {
 
       var trace = layer.getContext().getTrace();
 
-      if (isBrowser) {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();shadowColor=rgba(0,0,0,0.5);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;globalAlpha=0.5;drawImage([object HTMLCanvasElement],0,0,578,200);restore();'
-        );
-      } else {
-        assert.equal(
-          trace,
-          'clearRect(0,0,578,200);save();shadowColor=rgba(0,0,0,0.5);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;globalAlpha=0.5;drawImage([object Object],0,0,578,200);restore();'
-        );
-      }
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();shadowColor=rgba(0,0,0,0.5);shadowBlur=10;shadowOffsetX=20;shadowOffsetY=20;globalAlpha=0.5;drawImage([object HTMLCanvasElement],0,0,578,200);restore();'
+      );
 
       done();
     });
@@ -326,8 +305,7 @@ describe('Image', function () {
         height: 100,
       });
 
-      var canvas = createCanvas();
-      var context = canvas.getContext('2d');
+      const { canvas, context } = createCanvasAndContext();
       context.drawImage(imageObj, 200, 60, 100, 100);
       compareLayerAndCanvas(layer, canvas, 10);
       done();
@@ -348,7 +326,7 @@ describe('Image', function () {
         layer.add(image);
         layer.draw();
         assert.equal(image instanceof Konva.Image, true);
-        var nativeImg = image.image();
+        var nativeImg = image.image() as HTMLImageElement;
         assert.equal(nativeImg instanceof Image, true);
         assert.equal(nativeImg.src.indexOf(src) !== -1, true);
         assert.equal(nativeImg.complete, true);
@@ -362,9 +340,13 @@ describe('Image', function () {
     var layer = new Konva.Layer();
     stage.add(layer);
     var src = 'non-existent.jpg';
-    Konva.Image.fromURL(src, null, function (e) {
-      done();
-    });
+    Konva.Image.fromURL(
+      src,
+      () => {},
+      function (e) {
+        done();
+      }
+    );
   });
 
   it('check zero values', function (done) {
@@ -408,6 +390,51 @@ describe('Image', function () {
       assert.equal(
         layer.getContext().getTrace(true),
         'clearRect();save();transform();beginPath();moveTo();lineTo();arc();lineTo();arc();lineTo();arc();lineTo();arc();closePath();clip();drawImage();restore();'
+      );
+
+      done();
+    });
+  });
+
+  it('test image client rect without image object attached', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+    var image = new Konva.Image();
+    layer.add(image);
+    assert.equal(image.getClientRect().width, 0);
+    assert.equal(image.getClientRect().height, 0);
+  });
+
+  it('corner radius with shadow', function (done) {
+    // that will trigger buffer canvas
+    loadImage('darth-vader.jpg', (imageObj) => {
+      var stage = addStage();
+
+      var layer = new Konva.Layer();
+      var darth = new Konva.Image({
+        x: 20,
+        y: 20,
+        image: imageObj,
+        cornerRadius: 10,
+        draggable: true,
+        stroke: 'red',
+        strokeWidth: 100,
+        strokeEnabled: false,
+        shadowColor: 'black',
+        shadowBlur: 10,
+        shadowOffsetX: 10,
+        shadowOffsetY: 10,
+        scaleX: 0.5,
+        scaleY: 0.5,
+      });
+
+      layer.add(darth);
+      stage.add(layer);
+
+      assert.equal(
+        layer.getContext().getTrace(true),
+        'clearRect();save();shadowColor;shadowBlur;shadowOffsetX;shadowOffsetY;drawImage();restore();'
       );
 
       done();

@@ -1,6 +1,7 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { getNumberValidator } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { getNumberValidator } from '../Validators.ts';
 
 /**
  * Noise Filter. Randomly adds or substracts to the color channels
@@ -15,13 +16,12 @@ import { getNumberValidator } from '../Validators';
  * node.noise(0.8);
  */
 export const Noise: Filter = function (imageData) {
-  var amount = this.noise() * 255,
+  const amount = this.noise() * 255,
     data = imageData.data,
     nPixels = data.length,
-    half = amount / 2,
-    i;
+    half = amount / 2;
 
-  for (i = 0; i < nPixels; i += 4) {
+  for (let i = 0; i < nPixels; i += 4) {
     data[i + 0] += half - 2 * half * Math.random();
     data[i + 1] += half - 2 * half * Math.random();
     data[i + 2] += half - 2 * half * Math.random();

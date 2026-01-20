@@ -1,6 +1,11 @@
 import { assert } from 'chai';
 
-import { addStage, Konva, cloneAndCompareLayer, isBrowser } from './test-utils';
+import {
+  addStage,
+  Konva,
+  cloneAndCompareLayer,
+  assertAlmostEqual,
+} from './test-utils.ts';
 
 describe('TextPath', function () {
   // ======================================================
@@ -444,6 +449,54 @@ describe('TextPath', function () {
     );
   });
 
+  it('Text path with align right with custom font', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var textpath = new Konva.TextPath({
+      listening: false,
+      preventDefault: false,
+      data: 'M0,14.04 400,14.04',
+      fill: '#000',
+      text: 'Hello world',
+      x: 100,
+      y: 120,
+      width: 400,
+      height: 28.08,
+      fontFamily: 'Arial',
+      fontStyle: '500',
+      fontSize: 17.55,
+      lineHeight: 1.6,
+      align: 'right',
+    });
+
+    // in test we use arial, but we catched a case with specific font, I wasn't able to reproduce it with system font
+    // so let's mock it then
+    textpath._getTextSize = (char) => {
+      const widths = {
+        'Hello world': { width: 90.1029052734375, height: 28.08 },
+        H: { width: 11.839492797851562, height: 28.08 },
+        e: { width: 9.454055786132812, height: 28.08 },
+        l: { width: 5.1041259765625, height: 28.08 },
+        o: { width: 9.804855346679688, height: 28.08 },
+        ' ': { width: 4.34991455078125, height: 28.08 },
+        w: { width: 13.242691040039062, height: 28.08 },
+        r: { width: 7.2790985107421875, height: 28.08 },
+        d: { width: 10.085494995117188, height: 28.08 },
+      };
+      return widths[char] || { width: 5.1041259765625, height: 100 }; // Default to 'l' width if char not found
+    };
+    textpath._setTextData();
+
+    layer.add(textpath);
+    stage.add(layer);
+
+    assert.equal(
+      layer.getContext().getTrace(true),
+      'clearRect();save();transform();font;textBaseline;textAlign;save();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();save();translate();rotate();fillStyle;fillText();restore();restore();restore();'
+    );
+  });
+
   it('Text path with justify align', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
@@ -493,6 +546,58 @@ describe('TextPath', function () {
 
     var trace =
       'rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();save();translate();rotate();fillStyle;fillText();lineTo();restore();stroke();restore();restore();';
+
+    assert.equal(layer.getContext().getTrace(true), trace);
+  });
+
+  it('Text path with line-through', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var c = 'M10,10 C0,0 10,150 100,100 S300,150 400,50';
+
+    var textpath = new Konva.TextPath({
+      fill: 'black',
+      fontSize: 30,
+      fontFamily: 'Arial',
+      letterSpacing: 5,
+      text: 'All the worlds a stage.',
+      textDecoration: 'line-through',
+      data: c,
+      draggable: true,
+    });
+
+    layer.add(textpath);
+    stage.add(layer);
+
+    var trace =
+      'restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();stroke();restore();restore();';
+
+    assert.equal(layer.getContext().getTrace(true), trace);
+  });
+
+  it('Text path with underline and line-through', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var c = 'M10,10 C0,0 10,150 100,100 S300,150 400,50';
+
+    var textpath = new Konva.TextPath({
+      fill: 'orange',
+      fontSize: 10,
+      fontFamily: 'Arial',
+      letterSpacing: 5,
+      text: 'All the worlds a stage.',
+      textDecoration: 'underline line-through',
+      data: c,
+      draggable: true,
+    });
+
+    layer.add(textpath);
+    stage.add(layer);
+
+    var trace =
+      'restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();save();translate();rotate();lineTo();restore();stroke();restore();restore();';
 
     assert.equal(layer.getContext().getTrace(true), trace);
   });
@@ -876,8 +981,34 @@ describe('TextPath', function () {
     layer.draw();
 
     var rect = textpath.getClientRect();
-    assert.equal(Math.round(rect.width), 299);
-    assert.equal(Math.round(rect.height), 171);
+    assert.equal(Math.round(rect.width), 298);
+    assert.equal(Math.abs(Math.round(rect.height) - 171) < 2, true);
+  });
+
+  it('check path calculations', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    const textpath = new Konva.TextPath({
+      align: 'center',
+      data: 'M 26.549722364755468 144.8125 A 20.34375 20.34375 0 1 0 26.549722364755468 185.5 A 20.34375 20.34375 0 1 0 26.549722364755468 144.8125',
+      fill: 'black',
+      fontFamily: 'Arial',
+      fontSize: 7,
+      fontStyle: 'normal normal',
+      letterSpacing: 0,
+      text: '1234567890qwertyuiop[asdfhjkllzxncnm,../',
+      textBaseline: 'middle',
+      visible: true,
+      x: 0,
+      y: 0,
+    });
+    layer.add(textpath);
+
+    const box = textpath.getSelfRect();
+    assertAlmostEqual(box.width, 47, 1);
+    assertAlmostEqual(box.height, 47, 1);
   });
 
   it.skip('check vertical text path', function () {

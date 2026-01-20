@@ -3,14 +3,53 @@ import { assert } from 'chai';
 import {
   addStage,
   Konva,
-  createCanvas,
+  createCanvasAndContext,
   compareLayerAndCanvas,
   compareLayers,
   loadImage,
   isBrowser,
-  isNode,
   compareCanvases,
-} from './test-utils';
+} from './test-utils.ts';
+
+export function getOffsetY(
+  context: CanvasRenderingContext2D,
+  fontSize: number = 0,
+  lineHeight: number = 0
+) {
+  const metrics = context.measureText('M') as any;
+  fontSize =
+    fontSize || parseInt(context.font.split('px')[0].split(' ').pop()!, 10);
+  lineHeight = lineHeight || 1;
+
+  // Use the same fallbacks as Text.measureSize() for missing advanced metrics
+  const scaleFactor = fontSize / 100;
+  const fbFontBBoxAscent = 91 * scaleFactor;
+  const fbFontBBoxDescent = 21 * scaleFactor;
+  const fbActualAscent = 71.58203125 * scaleFactor;
+  const fbActualDescent = 0;
+
+  const fontBBoxAscent =
+    metrics.fontBoundingBoxAscent !== undefined
+      ? metrics.fontBoundingBoxAscent
+      : fbFontBBoxAscent;
+  const actualAscent =
+    metrics.actualBoundingBoxAscent !== undefined
+      ? metrics.actualBoundingBoxAscent
+      : fbActualAscent;
+  const fontBBoxDescent =
+    metrics.fontBoundingBoxDescent !== undefined
+      ? metrics.fontBoundingBoxDescent
+      : fbFontBBoxDescent;
+  const actualDescent =
+    metrics.actualBoundingBoxDescent !== undefined
+      ? metrics.actualBoundingBoxDescent
+      : fbActualDescent;
+
+  const ascent = fontBBoxAscent ?? actualAscent;
+  const descent = fontBBoxDescent ?? actualDescent;
+
+  return (ascent - descent) / 2 + (fontSize * lineHeight) / 2;
+}
 
 describe('Text', function () {
   // ======================================================
@@ -102,7 +141,7 @@ describe('Text', function () {
 
     assert.equal(
       layer.getContext().getTrace(false, true),
-      'clearRect(0,0,578,200);save();transform(1,0,0,1,40,40);shadowColor=rgba(255,0,0,0.2);shadowBlur=1;shadowOffsetX=10;shadowOffsetY=10;font=normal normal 50px Arial;textBaseline=middle;textAlign=left;translate(10,10);save();fillStyle=#888;fillText(Hello World!,108,30);lineWidth=2;shadowColor=rgba(0,0,0,0);strokeStyle=#333;miterLimit=2;strokeText(Hello World!,108,30);restore();restore();'
+      'clearRect(0,0,578,200);save();transform(1,0,0,1,40,40);shadowColor=rgba(255,0,0,0.2);shadowBlur=1;shadowOffsetX=10;shadowOffsetY=10;font=normal normal 50px Arial;textBaseline=alphabetic;textAlign=left;translate(10,10);save();fillStyle=#888;fillText(Hello World!,108,47);lineWidth=2;shadowColor=rgba(0,0,0,0);strokeStyle=#333;miterLimit=2;strokeText(Hello World!,108,47);restore();restore();'
     );
 
     assert.equal(text.getClassName(), 'Text', 'getClassName should be Text');
@@ -127,14 +166,13 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
-    context.textBaseline = 'middle';
+    const { canvas, context } = createCanvasAndContext();
+    context.textBaseline = 'alphabetic';
     context.font = 'normal normal 50px Arial';
     context.fillStyle = 'darkgrey';
-    context.fillText('Hello World!', 10, 10 + 50 + 25);
+    context.fillText('Hello World!', 10, 10 + 50 + getOffsetY(context));
     context.fillStyle = 'black';
-    context.fillText('Hello World!', 10, 10 + 25);
+    context.fillText('Hello World!', 10, 10 + getOffsetY(context));
 
     compareLayerAndCanvas(layer, canvas, 254, 200);
   });
@@ -146,7 +184,7 @@ describe('Text', function () {
     var text = new Konva.Text({
       x: 10,
       y: 10,
-      text: '😬',
+      text: '😬👧🏿',
       fontSize: 50,
       letterSpacing: 1,
     });
@@ -154,22 +192,77 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
+    context.textBaseline = 'alphabetic';
+    context.font = 'normal normal 50px Arial';
+
+    const offsetY = getOffsetY(context);
+
+    context.fillStyle = 'black';
+    context.fillText('😬👧🏿', 10, 10 + offsetY);
+
+    compareLayerAndCanvas(layer, canvas, 254, 100);
+  });
+
+  it('check emoji rendering', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var text = new Konva.Text({
+      text: '😁😁😁',
+      x: 10,
+      y: 10,
+      fontSize: 20,
+      draggable: true,
+      width: 55,
+      fill: 'black',
+      scaleY: 0.9999999999999973,
+    });
+
+    layer.add(text);
+    stage.add(layer);
+
+    const { canvas, context } = createCanvasAndContext();
+    context.textBaseline = 'alphabetic';
+    context.font = 'normal normal 20px Arial';
+    context.fillStyle = 'black';
+
+    context.fillText('😁😁', 10, 10 + getOffsetY(context));
+    context.fillText('😁', 10, 10 + 20 + getOffsetY(context));
+
+    compareLayerAndCanvas(layer, canvas, 254, 100);
+  });
+
+  it('check hindi with letterSpacing', function () {
+    if (Konva._renderBackend !== 'web') {
+      return;
+    }
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'आपकी दौड़ के लिए परफेक्ट जूते!',
+      fontSize: 50,
+      letterSpacing: 10,
+    });
+
+    layer.add(text);
+    stage.add(layer);
+
+    const { canvas, context } = createCanvasAndContext();
     context.textBaseline = 'middle';
+    context.letterSpacing = '10px';
     context.font = 'normal normal 50px Arial';
     context.fillStyle = 'darkgrey';
-    context.fillText('😬', 10, 10 + 25);
+    const offsetY = getOffsetY(context);
+    context.fillText('आपकी दौड़ के लिए परफेक्ट जूते!', 10, 10 + offsetY);
 
-    compareLayerAndCanvas(layer, canvas, 254);
+    compareLayerAndCanvas(layer, canvas, 254, 200);
   });
 
   it('text cache with fill and shadow', function () {
-    // TODO: on node-canvas it doesn't work
-    // text scaling is not correct
-    if (isNode) {
-      return;
-    }
     var stage = addStage();
     var layer1 = new Konva.Layer();
     layer1.getCanvas().setPixelRatio(1);
@@ -254,7 +347,7 @@ describe('Text', function () {
     var oldWidth = text.width();
     text.letterSpacing(10);
 
-    assert.equal(text.width(), oldWidth + 40);
+    assert.equal(text.width(), oldWidth + 50);
     layer.draw();
   });
   // ======================================================
@@ -512,10 +605,15 @@ describe('Text', function () {
     assert.equal(text.textArr.length, 7);
     assert.equal(text.textArr[6].text.slice(-1), '…');
 
-    if (isBrowser) {
+    if (Konva._renderBackend === 'web') {
       assert.equal(
         layer.getContext().getTrace(false, true),
-        "clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,7);restore();save();fillStyle=black;fillText(,50,21);restore();save();fillStyle=black;fillText(All the world's,7,35);restore();save();fillStyle=black;fillText(a stage,,25,49);restore();save();fillStyle=black;fillText(merely,28,63);restore();save();fillStyle=black;fillText(players. They,7,77);restore();save();fillStyle=black;fillText(have…,27,91);restore();restore();"
+        "clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,12);restore();save();fillStyle=black;fillText(,50,26);restore();save();fillStyle=black;fillText(All the world's a,1,40);restore();save();fillStyle=black;fillText(stage, merely,7,54);restore();save();fillStyle=black;fillText(players. They,7,68);restore();save();fillStyle=black;fillText(have theirrrrrrr,5,82);restore();save();fillStyle=black;fillText(exits and…,14,96);restore();restore();"
+      );
+    } else {
+      assert.equal(
+        layer.getContext().getTrace(false, true),
+        "clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,11);restore();save();fillStyle=black;fillText(,50,25);restore();save();fillStyle=black;fillText(All the world's a,1,39);restore();save();fillStyle=black;fillText(stage, merely,7,53);restore();save();fillStyle=black;fillText(players. They,8,67);restore();save();fillStyle=black;fillText(have theirrrrrrr,5,81);restore();save();fillStyle=black;fillText(exits and…,14,95);restore();restore();"
       );
     }
   });
@@ -545,10 +643,15 @@ describe('Text', function () {
     assert.equal(text.textArr.length, 2);
     assert.equal(text.textArr[1].text.slice(-1), '…');
 
-    if (isBrowser) {
+    if (Konva._renderBackend === 'web') {
       assert.equal(
         layer.getContext().getTrace(false, true),
-        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,7);restore();save();fillStyle=black;fillText(All the…,23,21);restore();restore();'
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,12);restore();save();fillStyle=black;fillText(All the…,23,26);restore();restore();'
+      );
+    } else {
+      assert.equal(
+        layer.getContext().getTrace(false, true),
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 14px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(HEADING,18,11);restore();save();fillStyle=black;fillText(All the…,23,25);restore();restore();'
       );
     }
   });
@@ -603,10 +706,21 @@ describe('Text', function () {
     assert.equal(text.textArr.length, 1);
     assert.equal(text.textArr[0].text, 'Hello foo b');
 
-    var trace =
-      'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,60,20);closePath();fillStyle=rgba(0, 0, 0, 0.4);fill();restore();save();transform(1,0,0,1,10,10);font=normal normal 12px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Hello foo b,0,6);restore();restore();';
+    if (Konva._renderBackend === 'web') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,60,20);closePath();fillStyle=rgba(0, 0, 0, 0.4);fill();restore();save();transform(1,0,0,1,10,10);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Hello foo b,0,10);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,60,20);closePath();fillStyle=rgba(0, 0, 0, 0.4);fill();restore();save();transform(1,0,0,1,10,10);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Hello foo b,0,10.2);restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,60,20);closePath();fillStyle=rgba(0, 0, 0, 0.4);fill();restore();save();transform(1,0,0,1,10,10);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Hello foo b,0,10.16);restore();restore();';
+      assert.equal(layer.getContext().getTrace(), trace);
+    }
   });
 
   // ======================================================
@@ -667,12 +781,10 @@ describe('Text', function () {
 
     stage.add(layer);
 
-    if (Konva.isBrowser) {
-      var trace =
-        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 30px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Y,0,15);fillStyle=black;fillText(O,20,15);fillStyle=black;fillText(U,43,15);fillStyle=black;fillText( ,65,15);fillStyle=black;fillText(A,73,15);fillStyle=black;fillText(R,93,15);fillStyle=black;fillText(E,115,15);fillStyle=black;fillText( ,135,15);fillStyle=black;fillText(I,143,15);fillStyle=black;fillText(N,151,15);fillStyle=black;fillText(V,173,15);fillStyle=black;fillText(I,193,15);fillStyle=black;fillText(T,201,15);fillStyle=black;fillText(E,220,15);fillStyle=black;fillText(D,240,15);fillStyle=black;fillText(!,261,15);restore();restore();';
+    var trace =
+      'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 30px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Y,0,25);fillStyle=black;fillText(O,20,25);fillStyle=black;fillText(U,43,25);fillStyle=black;fillText( ,65,25);fillStyle=black;fillText(A,73,25);fillStyle=black;fillText(R,93,25);fillStyle=black;fillText(E,115,25);fillStyle=black;fillText( ,135,25);fillStyle=black;fillText(I,143,25);fillStyle=black;fillText(N,151,25);fillStyle=black;fillText(V,173,25);fillStyle=black;fillText(I,193,25);fillStyle=black;fillText(T,201,25);fillStyle=black;fillText(E,220,25);fillStyle=black;fillText(D,240,25);fillStyle=black;fillText(!,261,25);restore();restore();';
 
-      assert.equal(layer.getContext().getTrace(false, true), trace);
-    }
+    assert.equal(layer.getContext().getTrace(false, true), trace);
   });
 
   it('text multi line with justify align and several paragraphs', function () {
@@ -736,7 +848,7 @@ describe('Text', function () {
       width: 380,
       align: 'justify',
       letterSpacing: 5,
-      textDecoration: 'underline',
+      textDecoration: 'underline line-through',
       padding: 20,
       draggable: true,
     });
@@ -747,14 +859,54 @@ describe('Text', function () {
 
     stage.add(layer);
 
-    if (isNode) {
-      return;
+    if (Konva._renderBackend === 'web') {
+      var trace =
+        'fillText(n,139.776,82);fillStyle=#555;fillText(d,152.563,82);fillStyle=#555;fillText( ,166.525,82);fillStyle=#555;fillText(o,175.415,82);fillStyle=#555;fillText(n,188.201,82);fillStyle=#555;fillText(e,200.987,82);fillStyle=#555;fillText( ,214.95,82);fillStyle=#555;fillText(m,223.84,82);fillStyle=#555;fillText(a,240.502,82);fillStyle=#555;fillText(n,253.288,82);fillStyle=#555;fillText( ,267.251,82);fillStyle=#555;fillText(i,276.141,82);fillStyle=#555;fillText(n,284.251,82);fillStyle=#555;fillText( ,298.214,82);fillStyle=#555;fillText(h,307.104,82);fillStyle=#555;fillText(i,319.89,82);fillStyle=#555;fillText(s,328,82);save();beginPath();moveTo(0,78);lineTo(340,78);stroke();restore();restore();save();save();beginPath();moveTo(0,100);lineTo(250,100);stroke();restore();fillStyle=#555;fillText(t,0,96);fillStyle=#555;fillText(i,8.89,96);fillStyle=#555;fillText(m,17,96);fillStyle=#555;fillText(e,33.662,96);fillStyle=#555;fillText( ,46.448,96);fillStyle=#555;fillText(p,55.338,96);fillStyle=#555;fillText(l,68.124,96);fillStyle=#555;fillText(a,76.234,96);fillStyle=#555;fillText(y,89.021,96);fillStyle=#555;fillText(s,101.021,96);fillStyle=#555;fillText( ,113.021,96);fillStyle=#555;fillText(m,121.91,96);fillStyle=#555;fillText(a,138.572,96);fillStyle=#555;fillText(n,151.358,96);fillStyle=#555;fillText(y,164.145,96);fillStyle=#555;fillText( ,176.145,96);fillStyle=#555;fillText(p,185.034,96);fillStyle=#555;fillText(a,197.82,96);fillStyle=#555;fillText(r,210.606,96);fillStyle=#555;fillText(t,220.269,96);fillStyle=#555;fillText(s,229.158,96);fillStyle=#555;fillText(.,241.158,96);save();beginPath();moveTo(0,92);lineTo(250,92);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'fillText(n,139.931,81.9);fillStyle=#555;fillText(d,152.717,81.9);fillStyle=#555;fillText( ,166.834,81.9);fillStyle=#555;fillText(o,175.724,81.9);fillStyle=#555;fillText(n,188.51,81.9);fillStyle=#555;fillText(e,201.296,81.9);fillStyle=#555;fillText( ,215.414,81.9);fillStyle=#555;fillText(m,224.303,81.9);fillStyle=#555;fillText(a,240.965,81.9);fillStyle=#555;fillText(n,253.752,81.9);fillStyle=#555;fillText( ,267.869,81.9);fillStyle=#555;fillText(i,276.759,81.9);fillStyle=#555;fillText(n,284.869,81.9);fillStyle=#555;fillText( ,298.986,81.9);fillStyle=#555;fillText(h,307.876,81.9);fillStyle=#555;fillText(i,320.662,81.9);fillStyle=#555;fillText(s,328.772,81.9);save();beginPath();moveTo(0,77.9);lineTo(340,77.9);stroke();restore();restore();save();save();beginPath();moveTo(0,99.9);lineTo(250,99.9);stroke();restore();fillStyle=#555;fillText(t,0,95.9);fillStyle=#555;fillText(i,8.89,95.9);fillStyle=#555;fillText(m,17,95.9);fillStyle=#555;fillText(e,33.662,95.9);fillStyle=#555;fillText( ,46.448,95.9);fillStyle=#555;fillText(p,55.338,95.9);fillStyle=#555;fillText(l,68.124,95.9);fillStyle=#555;fillText(a,76.234,95.9);fillStyle=#555;fillText(y,89.021,95.9);fillStyle=#555;fillText(s,101.021,95.9);fillStyle=#555;fillText( ,113.021,95.9);fillStyle=#555;fillText(m,121.91,95.9);fillStyle=#555;fillText(a,138.572,95.9);fillStyle=#555;fillText(n,151.358,95.9);fillStyle=#555;fillText(y,164.145,95.9);fillStyle=#555;fillText( ,176.145,95.9);fillStyle=#555;fillText(p,185.034,95.9);fillStyle=#555;fillText(a,197.82,95.9);fillStyle=#555;fillText(r,210.606,95.9);fillStyle=#555;fillText(t,220.269,95.9);fillStyle=#555;fillText(s,229.158,95.9);fillStyle=#555;fillText(.,241.158,95.9);save();beginPath();moveTo(0,91.9);lineTo(250,91.9);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      var trace =
+        'fillText(n,139.952,81.854);fillStyle=#555;fillText(d,152.742,81.854);fillStyle=#555;fillText( ,166.864,81.854);fillStyle=#555;fillText(o,175.754,81.854);fillStyle=#555;fillText(n,188.544,81.854);fillStyle=#555;fillText(e,201.334,81.854);fillStyle=#555;fillText( ,215.456,81.854);fillStyle=#555;fillText(m,224.346,81.854);fillStyle=#555;fillText(a,241.006,81.854);fillStyle=#555;fillText(n,253.796,81.854);fillStyle=#555;fillText( ,267.918,81.854);fillStyle=#555;fillText(i,276.808,81.854);fillStyle=#555;fillText(n,284.918,81.854);fillStyle=#555;fillText( ,299.04,81.854);fillStyle=#555;fillText(h,307.93,81.854);fillStyle=#555;fillText(i,320.72,81.854);fillStyle=#555;fillText(s,328.83,81.854);save();beginPath();moveTo(0,77.854);lineTo(340,77.854);stroke();restore();restore();save();save();beginPath();moveTo(0,99.854);lineTo(250,99.854);stroke();restore();fillStyle=#555;fillText(t,0,95.854);fillStyle=#555;fillText(i,8.89,95.854);fillStyle=#555;fillText(m,17,95.854);fillStyle=#555;fillText(e,33.66,95.854);fillStyle=#555;fillText( ,46.45,95.854);fillStyle=#555;fillText(p,55.34,95.854);fillStyle=#555;fillText(l,68.13,95.854);fillStyle=#555;fillText(a,76.24,95.854);fillStyle=#555;fillText(y,89.03,95.854);fillStyle=#555;fillText(s,101.03,95.854);fillStyle=#555;fillText( ,113.03,95.854);fillStyle=#555;fillText(m,121.92,95.854);fillStyle=#555;fillText(a,138.58,95.854);fillStyle=#555;fillText(n,151.37,95.854);fillStyle=#555;fillText(y,164.16,95.854);fillStyle=#555;fillText( ,176.16,95.854);fillStyle=#555;fillText(p,185.05,95.854);fillStyle=#555;fillText(a,197.84,95.854);fillStyle=#555;fillText(r,210.63,95.854);fillStyle=#555;fillText(t,220.29,95.854);fillStyle=#555;fillText(s,229.18,95.854);fillStyle=#555;fillText(.,241.18,95.854);save();beginPath();moveTo(0,91.854);lineTo(250,91.854);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
     }
+  });
 
-    var trace =
-      'fillText(c,69.696,77);fillStyle=#555;fillText(e,81.696,77);fillStyle=#555;fillText(s,94.482,77);fillStyle=#555;fillText(;,106.482,77);fillStyle=#555;fillText( ,117.549,77);fillStyle=#555;fillText(A,126.438,77);fillStyle=#555;fillText(n,140.776,77);fillStyle=#555;fillText(d,153.563,77);fillStyle=#555;fillText( ,168.525,77);fillStyle=#555;fillText(o,177.415,77);fillStyle=#555;fillText(n,190.201,77);fillStyle=#555;fillText(e,202.987,77);fillStyle=#555;fillText( ,217.95,77);fillStyle=#555;fillText(m,226.84,77);fillStyle=#555;fillText(a,243.502,77);fillStyle=#555;fillText(n,256.288,77);fillStyle=#555;fillText( ,271.251,77);fillStyle=#555;fillText(i,280.141,77);fillStyle=#555;fillText(n,288.251,77);fillStyle=#555;fillText( ,303.214,77);fillStyle=#555;fillText(h,312.104,77);fillStyle=#555;fillText(i,324.89,77);fillStyle=#555;fillText(s,333,77);restore();save();save();beginPath();moveTo(0,98);lineTo(245,98);stroke();restore();fillStyle=#555;fillText(t,0,91);fillStyle=#555;fillText(i,8.89,91);fillStyle=#555;fillText(m,17,91);fillStyle=#555;fillText(e,33.662,91);fillStyle=#555;fillText( ,46.448,91);fillStyle=#555;fillText(p,55.338,91);fillStyle=#555;fillText(l,68.124,91);fillStyle=#555;fillText(a,76.234,91);fillStyle=#555;fillText(y,89.021,91);fillStyle=#555;fillText(s,101.021,91);fillStyle=#555;fillText( ,113.021,91);fillStyle=#555;fillText(m,121.91,91);fillStyle=#555;fillText(a,138.572,91);fillStyle=#555;fillText(n,151.358,91);fillStyle=#555;fillText(y,164.145,91);fillStyle=#555;fillText( ,176.145,91);fillStyle=#555;fillText(p,185.034,91);fillStyle=#555;fillText(a,197.82,91);fillStyle=#555;fillText(r,210.606,91);fillStyle=#555;fillText(t,220.269,91);fillStyle=#555;fillText(s,229.158,91);fillStyle=#555;fillText(.,241.158,91);restore();restore();';
+  it('text decoration with stroke', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
 
-    assert.equal(layer.getContext().getTrace(), trace);
+    var text = new Konva.Text({
+      x: 50,
+      y: 50,
+      width: 800,
+      fontFamily: 'Microsoft Yahei',
+      verticalAlign: 'bottom',
+      lineHeight: 1,
+      text: 'ABCD123abcd中文',
+      fontSize: 80,
+      fill: 'red',
+      stroke: 'blue',
+      strokeWidth: 10,
+      draggable: true,
+      listening: true,
+      fillAfterStrokeEnabled: true,
+      textDecoration: 'line-through underline',
+    });
+    layer.add(text);
+    stage.add(layer);
+    stage.draw();
+
+    const trace = layer.getContext().getTrace(true);
+    assert.equal(
+      trace,
+      'clearRect();save();transform();font;textBaseline;textAlign;translate();save();save();beginPath();moveTo();lineTo();stroke();restore();lineWidth;strokeStyle;miterLimit;strokeText();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();restore();clearRect();save();transform();font;textBaseline;textAlign;translate();save();save();beginPath();moveTo();lineTo();stroke();restore();lineWidth;strokeStyle;miterLimit;strokeText();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();restore();'
+    );
   });
 
   // ======================================================
@@ -791,7 +943,7 @@ describe('Text', function () {
     if (isBrowser) {
       assert.equal(
         layer.getContext().getTrace(false, true),
-        "clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);shadowColor=rgba(255,0,0,0.5);shadowBlur=1;shadowOffsetX=10;shadowOffsetY=10;font=normal normal 16px Calibri;textBaseline=middle;textAlign=left;translate(20,20);save();fillStyle=#555;fillText(HEADING,133,8);restore();save();fillStyle=#555;fillText(,170,24);restore();save();fillStyle=#555;fillText(All the world's a stage, and all the men and women,6,40);restore();save();fillStyle=#555;fillText(merely players. They have their exits and their,21,56);restore();save();fillStyle=#555;fillText(entrances; And one man in his time plays many,18,72);restore();save();fillStyle=#555;fillText(parts.,152,88);restore();restore();"
+        "clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);shadowColor=rgba(255,0,0,0.5);shadowBlur=1;shadowOffsetX=10;shadowOffsetY=10;font=normal normal 16px Calibri;textBaseline=alphabetic;textAlign=left;translate(20,20);save();fillStyle=#555;fillText(HEADING,133,13);restore();save();fillStyle=#555;fillText(,170,29);restore();save();fillStyle=#555;fillText(All the world's a stage, and all the men and women,6,45);restore();save();fillStyle=#555;fillText(merely players. They have their exits and their,21,61);restore();save();fillStyle=#555;fillText(entrances; And one man in his time plays many,18,77);restore();save();fillStyle=#555;fillText(parts.,152,93);restore();restore();"
       );
     } else {
       // use relax, because in GitHub Actions calculations are too different
@@ -847,14 +999,31 @@ describe('Text', function () {
     text.fontFamily('"Font Awesome", Arial');
     layer.draw();
 
-    var trace =
-      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,6);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome";textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,6);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,6);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,6);restore();restore();';
+    if (Konva._renderBackend === 'web') {
+      var trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome";textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10.2);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome";textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10.2);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10.2);restore();restore();clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px "Font Awesome", Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,10.2);restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      var trace =
+        'clearRect();clearRect();save();transform();font;textBaseline;textAlign;translate();save();fillStyle;fillText();restore();restore();clearRect();save();transform();font;textBaseline;textAlign;translate();save();fillStyle;fillText();restore();restore();clearRect();save();transform();font;textBaseline;textAlign;translate();save();fillStyle;fillText();restore();restore();clearRect();save();transform();font;textBaseline;textAlign;translate();save();fillStyle;fillText();restore();restore();';
+
+      // relaxed for GitHub Actions
+      assert.equal(layer.getContext().getTrace(true, true), trace);
+    }
   });
 
   // ======================================================
   it('text with underline and large line height', function () {
+    if (Konva._renderBackend === 'node-canvas') {
+      return;
+    }
+
     var stage = addStage();
     var layer = new Konva.Layer();
 
@@ -869,19 +1038,18 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.translate(0, 80);
     context.lineWidth = 2;
     context.font = '80px Arial';
-    context.textBaseline = 'middle';
-    context.fillText('text', 0, 0);
+    context.textBaseline = 'alphabetic';
+    context.fillText('text', 0, getOffsetY(context, 80, 2) - 80);
     context.beginPath();
-    context.moveTo(0, 40);
-    context.lineTo(text.width(), 40);
+    context.moveTo(0, getOffsetY(context, 80, 2) - 60);
+    context.lineTo(text.width(), getOffsetY(context, 80, 2) - 60);
     context.lineWidth = 80 / 15;
     context.stroke();
-    compareLayerAndCanvas(layer, canvas, 50);
+    compareLayerAndCanvas(layer, canvas, 100, 100);
   });
 
   it('text multi line with strike', function () {
@@ -901,7 +1069,7 @@ describe('Text', function () {
     stage.add(layer);
 
     var trace =
-      'clearRect();save();transform();font;textBaseline;textAlign;translate();save();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();restore();save();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();restore();restore();';
+      'clearRect();save();transform();font;textBaseline;textAlign;translate();save();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();save();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();restore();';
     assert.equal(layer.getContext().getTrace(true), trace);
   });
 
@@ -922,9 +1090,41 @@ describe('Text', function () {
     stage.add(layer);
 
     var trace =
-      'clearRect();save();transform();font;textBaseline;textAlign;translate();save();save();beginPath();moveTo();lineTo();stroke();restore();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();restore();save();save();beginPath();moveTo();lineTo();stroke();restore();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();restore();restore();';
+      'clearRect();save();transform();font;textBaseline;textAlign;translate();save();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();save();save();beginPath();moveTo();lineTo();stroke();restore();fillStyle;fillText();save();beginPath();moveTo();lineTo();stroke();restore();restore();restore();';
 
     assert.equal(layer.getContext().getTrace(true), trace);
+  });
+
+  it('decoration with align', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'hello world',
+      fontSize: 40,
+      fill: 'black',
+      width: 300,
+      textDecoration: 'underline line-through',
+      align: 'center',
+    });
+    layer.add(text);
+    stage.add(layer);
+
+    if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(54,44);lineTo(245,44);stroke();restore();fillStyle=black;fillText(hello world,54,34);save();beginPath();moveTo(54,24);lineTo(245,24);stroke();restore();restore();restore();';
+      assert.equal(layer.getContext().getTrace(false, true), trace);
+    } else if (Konva._renderBackend === 'skia-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(54,43);lineTo(245,43);stroke();restore();fillStyle=black;fillText(hello world,54,33);save();beginPath();moveTo(54,23);lineTo(245,23);stroke();restore();restore();restore();';
+      assert.equal(layer.getContext().getTrace(false, true), trace);
+    } else {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(54,44);lineTo(245,44);stroke();restore();fillStyle=black;fillText(hello world,54,34);save();beginPath();moveTo(54,24);lineTo(245,24);stroke();restore();restore();restore();';
+      assert.equal(layer.getContext().getTrace(false, true), trace);
+    }
   });
 
   it('text multi line with underline and strike and gradient', function () {
@@ -948,13 +1148,22 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    if (isNode) {
-      return;
-    }
-    var trace =
-      'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,80);lineTo(169,80);stroke();restore();save();beginPath();moveTo(0,40);lineTo(169,40);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,40);restore();save();save();beginPath();moveTo(0,160);lineTo(191,160);stroke();restore();save();beginPath();moveTo(0,120);lineTo(191,120);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,120);restore();restore();';
+    if (Konva._renderBackend === 'web') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,87.5);lineTo(169,87.5);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,67.5);save();beginPath();moveTo(0,47.5);lineTo(169,47.5);stroke();restore();restore();save();save();beginPath();moveTo(0,167.5);lineTo(191,167.5);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,147.5);save();beginPath();moveTo(0,127.5);lineTo(191,127.5);stroke();restore();restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,88);lineTo(169,88);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,68);save();beginPath();moveTo(0,48);lineTo(169,48);stroke();restore();restore();save();save();beginPath();moveTo(0,168);lineTo(191,168);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,148);save();beginPath();moveTo(0,128);lineTo(191,128);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,87.734);lineTo(169,87.734);stroke();restore();fillStyle=[object Object];fillText(hello,0,67.734);save();beginPath();moveTo(0,47.734);lineTo(169,47.734);stroke();restore();restore();save();save();beginPath();moveTo(0,167.734);lineTo(191,167.734);stroke();restore();fillStyle=[object Object];fillText(world,0,147.734);save();beginPath();moveTo(0,127.734);lineTo(191,127.734);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    }
   });
 
   it('text multi line with underline and strike and gradient vertical', function () {
@@ -978,14 +1187,22 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    if (isNode) {
-      return;
+    if (Konva._renderBackend === 'web') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,87.5);lineTo(169,87.5);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,67.5);save();beginPath();moveTo(0,47.5);lineTo(169,47.5);stroke();restore();restore();save();save();beginPath();moveTo(0,167.5);lineTo(191,167.5);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,147.5);save();beginPath();moveTo(0,127.5);lineTo(191,127.5);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,88);lineTo(169,88);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,68);save();beginPath();moveTo(0,48);lineTo(169,48);stroke();restore();restore();save();save();beginPath();moveTo(0,168);lineTo(191,168);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,148);save();beginPath();moveTo(0,128);lineTo(191,128);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,87.734);lineTo(169,87.734);stroke();restore();fillStyle=[object Object];fillText(hello,0,67.734);save();beginPath();moveTo(0,47.734);lineTo(169,47.734);stroke();restore();restore();save();save();beginPath();moveTo(0,167.734);lineTo(191,167.734);stroke();restore();fillStyle=[object Object];fillText(world,0,147.734);save();beginPath();moveTo(0,127.734);lineTo(191,127.734);stroke();restore();restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(), trace);
     }
-
-    var trace =
-      'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,80);lineTo(169,80);stroke();restore();save();beginPath();moveTo(0,40);lineTo(169,40);stroke();restore();fillStyle=[object CanvasGradient];fillText(hello,0,40);restore();save();save();beginPath();moveTo(0,160);lineTo(191,160);stroke();restore();save();beginPath();moveTo(0,120);lineTo(191,120);stroke();restore();fillStyle=[object CanvasGradient];fillText(world,0,120);restore();restore();';
-
-    assert.equal(layer.getContext().getTrace(), trace);
   });
 
   it('text with underline and shadow', function () {
@@ -1120,17 +1337,10 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    if (isBrowser) {
-      assert.equal(
-        layer.getContext().getTrace(false, true),
-        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,200,100);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,10,10);font=normal normal 16px Arial;textBaseline=middle;textAlign=left;translate(10,42);save();fillStyle=#555;fillText(Some awesome text,17,8);restore();restore();'
-      );
-    } else {
-      assert.equal(
-        layer.getContext().getTrace(false, true),
-        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,200,100);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,10,10);font=normal normal 16px Arial;textBaseline=middle;textAlign=left;translate(10,42);save();fillStyle=#555;fillText(Some awesome text,17,8);restore();restore();'
-      );
-    }
+    assert.equal(
+      layer.getContext().getTrace(false, true),
+      'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);beginPath();rect(0,0,200,100);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,10,10);font=normal normal 16px Arial;textBaseline=alphabetic;textAlign=left;translate(10,42);save();fillStyle=#555;fillText(Some awesome text,17,13);restore();restore();'
+    );
   });
 
   it('get text width', function () {
@@ -1216,9 +1426,9 @@ describe('Text', function () {
     // so we need to adjust offset
     const diff = isBrowser ? 4 : 50;
     assert.equal(Math.abs(Math.round(text1.width()) - 1725) < diff, true);
-    assert.equal(Math.abs(Math.round(text2.width()) - 2613) < diff, true);
-    assert.equal(Math.abs(Math.round(text3.width()) - 2005) < diff, true);
-    assert.equal(Math.abs(Math.round(text4.width()) - 1932) < diff, true);
+    assert.equal(Math.abs(Math.round(text2.width()) - 2616) < diff, true);
+    assert.equal(Math.abs(Math.round(text3.width()) - 2009) < diff, true);
+    assert.equal(Math.abs(Math.round(text4.width()) - 1936) < diff, true);
   });
 
   it('default text color should be black', function () {
@@ -1244,17 +1454,16 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.translate(50, 50);
     context.lineWidth = 2;
     context.font = '50px Arial';
     context.strokeStyle = 'red';
     context.scale(2, 1);
-    context.textBaseline = 'middle';
-    context.fillText('text', 0, 25);
+    context.textBaseline = 'alphabetic';
+    context.fillText('text', 0, getOffsetY(context));
     context.miterLimit = 2;
-    context.strokeText('text', 0, 25);
+    context.strokeText('text', 0, getOffsetY(context));
     compareLayerAndCanvas(layer, canvas);
   });
 
@@ -1299,12 +1508,11 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var ctx = canvas.getContext('2d');
+    const { canvas, context: ctx } = createCanvasAndContext();
 
     ctx.fillStyle = 'green';
     ctx.font = 'normal 50px Arial';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'alphabetic';
 
     var start = { x: 0, y: 0 };
     var end = { x: 300, y: 0 };
@@ -1317,7 +1525,7 @@ describe('Text', function () {
     }
     ctx.fillStyle = grd;
 
-    ctx.fillText(text.text(), text.x(), text.y() + text.fontSize() / 2);
+    ctx.fillText(text.text(), text.x(), text.y() + getOffsetY(ctx));
 
     compareLayerAndCanvas(layer, canvas, 200);
   });
@@ -1339,12 +1547,11 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var ctx = canvas.getContext('2d');
+    const { canvas, context: ctx } = createCanvasAndContext();
 
     ctx.fillStyle = 'green';
     ctx.font = 'normal 50px Arial';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'alphabetic';
 
     var start = { x: 0, y: 0 };
     var end = { x: 0, y: 100 };
@@ -1357,20 +1564,15 @@ describe('Text', function () {
     }
     ctx.fillStyle = grd;
 
+    ctx.fillText('Text with gradient!!', text.x(), text.y() + getOffsetY(ctx));
     ctx.fillText(
       'Text with gradient!!',
       text.x(),
-      text.y() + text.fontSize() / 2
-    );
-    ctx.fillText(
-      'Text with gradient!!',
-      text.x(),
-      text.y() + text.fontSize() / 2 + text.fontSize()
+      text.y() + getOffsetY(ctx) + text.fontSize()
     );
 
     compareLayerAndCanvas(layer, canvas, 200);
 
-    var data = layer.getContext().getImageData(25, 41, 1, 1).data;
     Konva.pixelRatio = oldRatio;
   });
 
@@ -1395,12 +1597,11 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var ctx = canvas.getContext('2d');
+    const { canvas, context: ctx } = createCanvasAndContext();
 
     ctx.fillStyle = 'green';
     ctx.font = 'normal 50px Arial';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'alphabetic';
 
     var start = { x: 100, y: 0 };
     var end = { x: 100, y: 0 };
@@ -1413,9 +1614,7 @@ describe('Text', function () {
     }
     ctx.fillStyle = grd;
 
-    ctx.translate(0, 25);
-
-    ctx.fillText(text.text(), 0, 0);
+    ctx.fillText(text.text(), 0, getOffsetY(ctx));
 
     Konva.pixelRatio = oldRatio;
 
@@ -1443,12 +1642,20 @@ describe('Text', function () {
     layer.add(text);
     stage.add(layer);
 
-    // this text should look like it is positioned in y = 40
+    if (
+      Konva._renderBackend === 'web' ||
+      Konva._renderBackend === 'node-canvas'
+    ) {
+      var trace =
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();rect(0,0,100,120);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,0,0);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Some good text,0,74);restore();restore();';
 
-    var trace =
-      'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();rect(0,0,100,120);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,0,0);font=normal normal 40px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Some good text,0,60);restore();restore();';
-
-    assert.equal(layer.getContext().getTrace(), trace);
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      assert.equal(
+        layer.getContext().getTrace(),
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();rect(0,0,100,120);closePath();lineWidth=2;strokeStyle=black;stroke();restore();save();transform(1,0,0,1,0,0);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(Some good text,0,73.867);restore();restore();'
+      );
+    }
   });
 
   it('check wrapping', function () {
@@ -1517,29 +1724,24 @@ describe('Text', function () {
       layer.add(text);
       stage.add(layer);
 
-      var canvas = createCanvas();
-      var ctx = canvas.getContext('2d');
+      const { canvas, context: ctx } = createCanvasAndContext();
 
       ctx.fillStyle = 'green';
       ctx.font = 'normal normal 30px Arial';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'alphabetic';
 
-      var grd = ctx.createPattern(imageObj, 'repeat');
+      var grd = ctx.createPattern(imageObj, 'repeat')!;
       ctx.fillStyle = grd;
 
-      ctx.fillText(text.text(), 0, 15);
+      ctx.fillText(text.text(), 0, getOffsetY(ctx));
 
-      compareLayerAndCanvas(layer, canvas, 200);
+      compareLayerAndCanvas(layer, canvas, 200, 30);
       Konva.pixelRatio = oldRatio;
       done();
     });
   });
 
   it('image gradient for text with offset', function (done) {
-    if (isNode) {
-      // skip in NodeJS because it has not transform API on gradients
-      return done();
-    }
     const oldRatio = Konva.pixelRatio;
     Konva.pixelRatio = 1;
     loadImage('darth-vader.jpg', (imageObj) => {
@@ -1556,27 +1758,21 @@ describe('Text', function () {
       layer.add(text);
       stage.add(layer);
 
-      var canvas = createCanvas();
-      var ctx = canvas.getContext('2d');
+      const { canvas, context: ctx } = createCanvasAndContext();
 
       ctx.fillStyle = 'green';
       ctx.font = 'normal normal 30px Arial';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'alphabetic';
 
-      var grd = ctx.createPattern(imageObj, 'repeat');
-      grd.setTransform({
-        a: 1,
-        b: 0,
-        c: 0,
-        d: 1,
-        e: -50,
-        f: 0,
-      });
+      var grd = ctx.createPattern(imageObj, 'repeat')!;
+      const matrix = new (global as any).DOMMatrix([1, 0, 0, 1, -50, 0]);
+      grd.setTransform(matrix);
+
       ctx.fillStyle = grd;
 
-      ctx.fillText(text.text(), 0, 15);
+      ctx.fillText(text.text(), 0, getOffsetY(ctx));
 
-      compareLayerAndCanvas(layer, canvas, 200);
+      compareLayerAndCanvas(layer, canvas, 200, 30);
       Konva.pixelRatio = oldRatio;
       done();
     });
@@ -1599,34 +1795,24 @@ describe('Text', function () {
       layer.add(text);
       stage.add(layer);
 
-      var canvas = createCanvas();
-      var ctx = canvas.getContext('2d');
+      const { canvas, context: ctx } = createCanvasAndContext();
 
       ctx.fillStyle = 'green';
       ctx.font = 'normal normal 30px Arial';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'alphabetic';
 
-      var grd = ctx.createPattern(imageObj, 'repeat');
-      const matrix =
-        typeof DOMMatrix === 'undefined'
-          ? {
-              a: 0.5, // Horizontal scaling. A value of 1 results in no scaling.
-              b: 0, // Vertical skewing.
-              c: 0, // Horizontal skewing.
-              d: 0.5,
-              e: 0, // Horizontal translation (moving).
-              f: 0, // Vertical translation (moving).
-            }
-          : new DOMMatrix([0.5, 0, 0, 0.5, 0, 0]);
+      var grd = ctx.createPattern(imageObj, 'repeat')!;
+      const matrix = new (global as any).DOMMatrix([0.5, 0, 0, 0.5, 0, 0]);
 
       grd.setTransform(matrix);
 
       ctx.fillStyle = grd;
 
-      ctx.fillText(text.text(), 0, 15);
+      ctx.fillText(text.text(), 0, getOffsetY(ctx));
 
-      compareLayerAndCanvas(layer, canvas, 200);
       Konva.pixelRatio = oldRatio;
+      compareLayerAndCanvas(layer, canvas, 200, 30);
+
       done();
     });
   });
@@ -1649,12 +1835,19 @@ describe('Text', function () {
     layer.add(text);
     layer.draw();
 
-    var trace =
-      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 80px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();lineWidth=20;strokeStyle=red;miterLimit=2;strokeText(HELLO WORLD,0,40);fillStyle=black;fillText(HELLO WORLD,0,40);restore();restore();';
+    if (Konva._renderBackend === 'node-canvas') {
+      var trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();lineWidth=20;strokeStyle=red;miterLimit=2;strokeText(HELLO WORLD,0,68);fillStyle=black;fillText(HELLO WORLD,0,68);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+      assert.equal(layer.getContext().getTrace(false, true), trace);
+    } else {
+      var trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();lineWidth=20;strokeStyle=red;miterLimit=2;strokeText(HELLO WORLD,0,67);fillStyle=black;fillText(HELLO WORLD,0,67);restore();restore();';
+
+      assert.equal(layer.getContext().getTrace(false, true), trace);
+    }
   });
-  
+
   it('sets ltr text direction', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
@@ -1669,13 +1862,12 @@ describe('Text', function () {
     layer.draw();
 
     var trace =
-      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(ltr text,0,6);restore();restore();';
+      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(ltr text,0,10);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+    assert.equal(layer.getContext().getTrace(false, true), trace);
   });
-  
-  
- it('sets rtl text direction', function () {
+
+  it('sets rtl text direction', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
 
@@ -1689,11 +1881,11 @@ describe('Text', function () {
     layer.draw();
 
     var trace =
-      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);direction=rtl;font=normal normal 12px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();fillStyle=black;fillText(rtl text,0,6);restore();restore();';
+      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);direction=rtl;font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(rtl text,0,10);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+    assert.equal(layer.getContext().getTrace(false, true), trace);
   });
-  
+
   it('sets rtl text direction with letterSpacing', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
@@ -1709,8 +1901,143 @@ describe('Text', function () {
     layer.draw();
 
     var trace =
-      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);direction=rtl;font=normal normal 12px Arial;textBaseline=middle;textAlign=left;translate(0,0);save();letterSpacing=2px;fillStyle=black;fillText(rtl text,0,6);restore();restore();';
+      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);direction=rtl;font=normal normal 12px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();letterSpacing=2px;fillStyle=black;fillText(rtl text,0,10);restore();restore();';
 
-    assert.equal(layer.getContext().getTrace(), trace);
+    assert.equal(layer.getContext().getTrace(false, true), trace);
+  });
+
+  it('try fixed render', () => {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    stage.add(layer);
+    var text = new Konva.Text({ text: 'hello', fontSize: 100 });
+
+    layer.add(text);
+    layer.draw();
+
+    if (Konva._renderBackend === 'skia-canvas') {
+      const trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 100px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,84.668);restore();restore();';
+      assert.equal(layer.getContext().getTrace(), trace);
+    } else {
+      const trace =
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);font=normal normal 100px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();fillStyle=black;fillText(hello,0,85);restore();restore();';
+      assert.equal(layer.getContext().getTrace(), trace);
+    }
+  });
+
+  it('charRenderFunc draws per character and can mutate context', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'AB',
+      fontSize: 20,
+      charRenderFunc: function (props) {
+        if (props.index === 1) {
+          // shift only the second character
+          props.context.translate(0, 10);
+        }
+      },
+    });
+    layer.add(text);
+    layer.draw();
+
+    var trace = layer.getContext().getTrace();
+
+    if (Konva._renderBackend === 'web') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 20px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();fillStyle=black;fillText(A,0,17);restore();save();translate(0,10);fillStyle=black;fillText(B,13.34,17);restore();restore();restore();'
+      );
+    } else if (Konva._renderBackend === 'node-canvas') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 20px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();fillStyle=black;fillText(A,0,17);restore();save();translate(0,10);fillStyle=black;fillText(B,13.34,17);restore();restore();restore();'
+      );
+    } else {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 20px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();fillStyle=black;fillText(A,0,16.934);restore();save();translate(0,10);fillStyle=black;fillText(B,13.34,16.934);restore();restore();restore();'
+      );
+    }
+  });
+
+  it('text decoration with letterSpacing and lineHeight', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'hello\nworld',
+      fontSize: 40,
+      fill: 'red',
+      letterSpacing: 5,
+      lineHeight: 2,
+      textDecoration: 'underline line-through',
+    });
+
+    layer.add(text);
+    stage.add(layer);
+
+    var trace = layer.getContext().getTrace(false, true);
+    if (Konva._renderBackend === 'web') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,64);lineTo(110,64);stroke();restore();fillStyle=red;fillText(h,0,54);fillStyle=red;fillText(e,27,54);fillStyle=red;fillText(l,54,54);fillStyle=red;fillText(l,68,54);fillStyle=red;fillText(o,82,54);save();beginPath();moveTo(0,44);lineTo(110,44);stroke();restore();restore();save();save();beginPath();moveTo(0,144);lineTo(121,144);stroke();restore();fillStyle=red;fillText(w,0,134);fillStyle=red;fillText(o,33,134);fillStyle=red;fillText(r,61,134);fillStyle=red;fillText(l,79,134);fillStyle=red;fillText(d,93,134);save();beginPath();moveTo(0,124);lineTo(121,124);stroke();restore();restore();restore();'
+      );
+    } else if (Konva._renderBackend === 'node-canvas') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,64);lineTo(110,64);stroke();restore();fillStyle=red;fillText(h,0,54);fillStyle=red;fillText(e,27,54);fillStyle=red;fillText(l,54,54);fillStyle=red;fillText(l,68,54);fillStyle=red;fillText(o,82,54);save();beginPath();moveTo(0,44);lineTo(110,44);stroke();restore();restore();save();save();beginPath();moveTo(0,144);lineTo(121,144);stroke();restore();fillStyle=red;fillText(w,0,134);fillStyle=red;fillText(o,33,134);fillStyle=red;fillText(r,61,134);fillStyle=red;fillText(l,79,134);fillStyle=red;fillText(d,93,134);save();beginPath();moveTo(0,124);lineTo(121,124);stroke();restore();restore();restore();'
+      );
+    } else {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 40px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,63);lineTo(110,63);stroke();restore();fillStyle=red;fillText(h,0,53);fillStyle=red;fillText(e,27,53);fillStyle=red;fillText(l,54,53);fillStyle=red;fillText(l,68,53);fillStyle=red;fillText(o,82,53);save();beginPath();moveTo(0,43);lineTo(110,43);stroke();restore();restore();save();save();beginPath();moveTo(0,143);lineTo(121,143);stroke();restore();fillStyle=red;fillText(w,0,133);fillStyle=red;fillText(o,33,133);fillStyle=red;fillText(r,61,133);fillStyle=red;fillText(l,79,133);fillStyle=red;fillText(d,93,133);save();beginPath();moveTo(0,123);lineTo(121,123);stroke();restore();restore();restore();'
+      );
+    }
+  });
+
+  it('text with underline offset', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var text = new Konva.Text({
+      x: 10,
+      y: 10,
+      text: 'hello\nworld',
+      fontSize: 80,
+      fill: 'red',
+      textDecoration: 'underline',
+      underlineOffset: 16,
+    });
+
+    layer.add(text);
+    stage.add(layer);
+
+    const trace = layer.getContext().getTrace();
+
+    if (Konva._renderBackend === 'web') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,83.5);lineTo(169,83.5);stroke();restore();fillStyle=red;fillText(hello,0,67.5);restore();save();save();beginPath();moveTo(0,163.5);lineTo(191,163.5);stroke();restore();fillStyle=red;fillText(world,0,147.5);restore();restore();'
+      );
+    } else if (Konva._renderBackend === 'node-canvas') {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,84);lineTo(169,84);stroke();restore();fillStyle=red;fillText(hello,0,68);restore();save();save();beginPath();moveTo(0,164);lineTo(191,164);stroke();restore();fillStyle=red;fillText(world,0,148);restore();restore();'
+      );
+    } else {
+      assert.equal(
+        trace,
+        'clearRect(0,0,578,200);save();transform(1,0,0,1,10,10);font=normal normal 80px Arial;textBaseline=alphabetic;textAlign=left;translate(0,0);save();save();beginPath();moveTo(0,83.734);lineTo(169,83.734);stroke();restore();fillStyle=red;fillText(hello,0,67.734);restore();save();save();beginPath();moveTo(0,163.734);lineTo(191,163.734);stroke();restore();fillStyle=red;fillText(world,0,147.734);restore();restore();'
+      );
+    }
   });
 });

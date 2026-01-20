@@ -1,15 +1,16 @@
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { _registerNode } from '../Global';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { _registerNode } from '../Global.ts';
 
-import { Util } from '../Util';
-import { GetSet } from '../types';
-import { Context } from '../Context';
-import { getNumberOrArrayOfNumbersValidator } from '../Validators';
+import { Util } from '../Util.ts';
+import type { GetSet } from '../types.ts';
+import type { Context } from '../Context.ts';
+import { getNumberOrArrayOfNumbersValidator } from '../Validators.ts';
 
-export interface RectConfig extends ShapeConfig {
+export type RectConfig = ShapeConfig & {
   cornerRadius?: number | number[];
-}
+};
 
 /**
  * Rect constructor
@@ -31,7 +32,7 @@ export interface RectConfig extends ShapeConfig {
  */
 export class Rect extends Shape<RectConfig> {
   _sceneFunc(context: Context) {
-    var cornerRadius = this.cornerRadius(),
+    const cornerRadius = this.cornerRadius(),
       width = this.width(),
       height = this.height();
 

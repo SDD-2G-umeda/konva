@@ -9,7 +9,7 @@ import {
   simulateTouchStart,
   simulateTouchEnd,
   isNode,
-} from './test-utils';
+} from './test-utils.ts';
 
 describe('MouseEvents', function () {
   // ======================================================
@@ -1550,7 +1550,7 @@ describe('MouseEvents', function () {
     stage.add(layer);
 
     // events array
-    var e = [];
+    var e: string[] = [];
 
     circle.on('click', function () {
       e.push('circle');
@@ -2068,7 +2068,7 @@ describe('MouseEvents', function () {
       type: 'mouseenter',
     };
 
-    stage._pointerenter(evt);
+    stage._pointerenter(evt as PointerEvent);
 
     assert.equal(mouseenterCount, 1, 'mouseenterCount should be 1');
   });
@@ -2268,7 +2268,7 @@ describe('MouseEvents', function () {
       type: 'mouseenter',
     };
 
-    stage._pointerenter(evt);
+    stage._pointerenter(evt as PointerEvent);
 
     simulateMouseMove(stage, {
       x: 10,
@@ -2376,5 +2376,65 @@ describe('MouseEvents', function () {
       y: 30,
     });
     assert.deepEqual(stage.getPointerPosition(), { x: 60, y: 60 });
+  });
+
+  it('mousedown on empty then mouseup on shape', function () {
+    if (isNode) {
+      return;
+    }
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    stage.on('mousedown mousemove mouseup click', function (e) {});
+
+    var rect = new Konva.Rect({
+      width: 50,
+      height: 50,
+      fill: 'red',
+      draggable: true,
+    });
+    layer.add(rect);
+
+    layer.draw();
+
+    var clicks = 0;
+    rect.on('click', function () {
+      clicks += 1;
+      if (clicks === 2) {
+        debugger;
+      }
+    });
+
+    simulateMouseDown(stage, {
+      x: 40,
+      y: 40,
+    });
+
+    simulateMouseUp(stage, {
+      x: 40,
+      y: 40,
+    });
+
+    // trigger click
+    assert.equal(clicks, 1, 'clicks not triggered');
+
+    // mousedown outside
+    simulateMouseDown(stage, {
+      x: 60,
+      y: 6,
+    });
+    // move into rect
+    simulateMouseMove(stage, {
+      x: 40,
+      y: 40,
+    });
+    // mouseup inside rect
+    simulateMouseUp(stage, {
+      x: 40,
+      y: 40,
+    });
+    // it shouldn't trigger the click event!!!
+    assert.equal(clicks, 1, 'clicks not triggered');
   });
 });

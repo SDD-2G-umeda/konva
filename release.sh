@@ -5,9 +5,6 @@ old_version="$(git describe --abbrev=0 --tags)"
 new_version=$1
 
 
-old_cdn="https://unpkg.com/konva@${old_version}/konva.js"
-new_cdn="https://unpkg.com/konva@${new_version}/konva.js"
-
 old_cdn_min="https://unpkg.com/konva@${old_version}/konva.min.js"
 new_cdn_min="https://unpkg.com/konva@${new_version}/konva.min.js"
 
@@ -49,7 +46,7 @@ echo "build for $1"
 npm run build >/dev/null
 git commit -am "build for $1" --allow-empty >/dev/null
 
-echo "update CDN link in REAME"
+echo "update CDN link in README"
 perl -i -pe "s|${old_cdn_min}|${new_cdn_min}|g" ./README.md >/dev/null
 git commit -am "update cdn link" --allow-empty >/dev/null
 
@@ -61,17 +58,5 @@ git push >/dev/null
 git push --tags >/dev/null
 npm publish
 
-echo "copy konva.js into konva-site"
-cp ./konva.js ../konva-site/
-cd ../konva-site
-
-echo "replace CDN links"
-
-
-find source themes/hexo3/layout react-demos vue-demos main-demo -name "*.json" -exec perl -i -pe "s|${old_version}|${new_version}|g" {} + >/dev/null
-find source themes/hexo3/layout react-demos vue-demos main-demo -name "*.html" -exec perl -i -pe "s|${old_version}|${new_version}|g" {} + >/dev/null
-
-echo "regenerate site"
-./deploy.sh >/dev/null
 
 echo "DONE!"

@@ -1,19 +1,18 @@
-import { Util } from './Util';
-import { SceneContext, HitContext, Context } from './Context';
-import { Konva } from './Global';
-import { Factory } from './Factory';
-import { getNumberValidator } from './Validators';
+import { Util } from './Util.ts';
+import type { Context } from './Context.ts';
+import { SceneContext, HitContext } from './Context.ts';
+import { Konva } from './Global.ts';
 
 // calculate pixel ratio
-var _pixelRatio;
+let _pixelRatio;
 function getDevicePixelRatio() {
   if (_pixelRatio) {
     return _pixelRatio;
   }
-  var canvas = Util.createCanvasElement();
-  var context = canvas.getContext('2d') as any;
+  const canvas = Util.createCanvasElement();
+  const context = canvas.getContext('2d') as any;
   _pixelRatio = (function () {
-    var devicePixelRatio = Konva._global.devicePixelRatio || 1,
+    const devicePixelRatio = Konva._global.devicePixelRatio || 1,
       backingStoreRatio =
         context.webkitBackingStorePixelRatio ||
         context.mozBackingStorePixelRatio ||
@@ -55,9 +54,9 @@ export class Canvas {
   isCache = false;
 
   constructor(config: ICanvasConfig) {
-    var conf = config || {};
+    const conf = config || {};
 
-    var pixelRatio =
+    const pixelRatio =
       conf.pixelRatio || Konva.pixelRatio || getDevicePixelRatio();
 
     this.pixelRatio = pixelRatio;
@@ -82,11 +81,34 @@ export class Canvas {
   getContext() {
     return this.context;
   }
+  /**
+   * get pixel ratio
+   * @method
+   * @name Konva.Canvas#getPixelRatio
+   * @returns {Number} pixel ratio
+   * @example
+   * var pixelRatio = layer.getCanvas.getPixelRatio();
+   */
   getPixelRatio() {
     return this.pixelRatio;
   }
+  /**
+   * set pixel ratio
+   * KonvaJS automatically handles pixel ratio adustments in order to render crisp drawings
+   *  on all devices. Most desktops, low end tablets, and low end phones, have device pixel ratios
+   *  of 1.  Some high end tablets and phones, like iPhones and iPads have a device pixel ratio
+   *  of 2.  Some Macbook Pros, and iMacs also have a device pixel ratio of 2.  Some high end Android devices have pixel
+   *  ratios of 2 or 3.  Some browsers like Firefox allow you to configure the pixel ratio of the viewport.  Unless otherwise
+   *  specificed, the pixel ratio will be defaulted to the actual device pixel ratio.  You can override the device pixel
+   *  ratio for special situations, or, if you don't want the pixel ratio to be taken into account, you can set it to 1.
+   * @method
+   * @name Konva.Canvas#setPixelRatio
+   * @param {Number} pixelRatio
+   * @example
+   * layer.getCanvas().setPixelRatio(3);
+   */
   setPixelRatio(pixelRatio) {
-    var previousRatio = this.pixelRatio;
+    const previousRatio = this.pixelRatio;
     this.pixelRatio = pixelRatio;
     this.setSize(
       this.getWidth() / previousRatio,
@@ -98,7 +120,7 @@ export class Canvas {
     this.width = this._canvas.width = width * this.pixelRatio;
     this._canvas.style.width = width + 'px';
 
-    var pixelRatio = this.pixelRatio,
+    const pixelRatio = this.pixelRatio,
       _context = this.getContext()._context;
     _context.scale(pixelRatio, pixelRatio);
   }
@@ -106,7 +128,7 @@ export class Canvas {
     // take into account pixel ratio
     this.height = this._canvas.height = height * this.pixelRatio;
     this._canvas.style.height = height + 'px';
-    var pixelRatio = this.pixelRatio,
+    const pixelRatio = this.pixelRatio,
       _context = this.getContext()._context;
     _context.scale(pixelRatio, pixelRatio);
   }
@@ -147,28 +169,6 @@ export class Canvas {
     }
   }
 }
-
-/**
- * get/set pixel ratio.
- * KonvaJS automatically handles pixel ratio adustments in order to render crisp drawings
- *  on all devices. Most desktops, low end tablets, and low end phones, have device pixel ratios
- *  of 1.  Some high end tablets and phones, like iPhones and iPads have a device pixel ratio
- *  of 2.  Some Macbook Pros, and iMacs also have a device pixel ratio of 2.  Some high end Android devices have pixel
- *  ratios of 2 or 3.  Some browsers like Firefox allow you to configure the pixel ratio of the viewport.  Unless otherwise
- *  specificed, the pixel ratio will be defaulted to the actual device pixel ratio.  You can override the device pixel
- *  ratio for special situations, or, if you don't want the pixel ratio to be taken into account, you can set it to 1.
- * @name Konva.Canvas#pixelRatio
- * @method
- * @param {Number} pixelRatio
- * @returns {Number}
- * @example
- * // get
- * var pixelRatio = layer.getCanvas.pixelRatio();
- *
- * // set
- * layer.getCanvas().pixelRatio(3);
- */
-Factory.addGetterSetter(Canvas, 'pixelRatio', undefined, getNumberValidator());
 
 export class SceneCanvas extends Canvas {
   constructor(

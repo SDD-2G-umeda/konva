@@ -1,15 +1,17 @@
-import { Util } from './Util';
-import { Container, ContainerConfig } from './Container';
-import { Node } from './Node';
-import { Factory } from './Factory';
-import { SceneCanvas, HitCanvas } from './Canvas';
-import { Stage } from './Stage';
-import { getBooleanValidator } from './Validators';
+import { Util } from './Util.ts';
+import type { ContainerConfig } from './Container.ts';
+import { Container } from './Container.ts';
+import { Node } from './Node.ts';
+import { Factory } from './Factory.ts';
+import { SceneCanvas, HitCanvas } from './Canvas.ts';
+import type { Stage } from './Stage.ts';
+import { getBooleanValidator } from './Validators.ts';
 
-import { GetSet, Vector2d } from './types';
-import { Group } from './Group';
-import { Shape, shapes } from './Shape';
-import { _registerNode } from './Global';
+import type { GetSet, Vector2d } from './types.ts';
+import type { Group } from './Group.ts';
+import type { Shape } from './Shape.ts';
+import { shapes } from './Shape.ts';
+import { _registerNode } from './Global.ts';
 
 export interface LayerConfig extends ContainerConfig {
   clearBeforeDraw?: boolean;
@@ -18,7 +20,7 @@ export interface LayerConfig extends ContainerConfig {
 }
 
 // constants
-var HASH = '#',
+const HASH = '#',
   BEFORE_DRAW = 'beforeDraw',
   DRAW = 'draw',
   /*
@@ -114,9 +116,9 @@ export class Layer extends Container<Group | Shape> {
     return this;
   }
   // extend Node.prototype.setZIndex
-  setZIndex(index) {
+  setZIndex(index: number) {
     super.setZIndex(index);
-    var stage = this.getStage();
+    const stage = this.getStage();
     if (stage && stage.content) {
       stage.content.removeChild(this.getNativeCanvasElement());
 
@@ -133,7 +135,7 @@ export class Layer extends Container<Group | Shape> {
   }
   moveToTop() {
     Node.prototype.moveToTop.call(this);
-    var stage = this.getStage();
+    const stage = this.getStage();
     if (stage && stage.content) {
       stage.content.removeChild(this.getNativeCanvasElement());
       stage.content.appendChild(this.getNativeCanvasElement());
@@ -141,11 +143,11 @@ export class Layer extends Container<Group | Shape> {
     return true;
   }
   moveUp() {
-    var moved = Node.prototype.moveUp.call(this);
+    const moved = Node.prototype.moveUp.call(this);
     if (!moved) {
       return false;
     }
-    var stage = this.getStage();
+    const stage = this.getStage();
     if (!stage || !stage.content) {
       return false;
     }
@@ -164,9 +166,9 @@ export class Layer extends Container<Group | Shape> {
   // extend Node.prototype.moveDown
   moveDown() {
     if (Node.prototype.moveDown.call(this)) {
-      var stage = this.getStage();
+      const stage = this.getStage();
       if (stage) {
-        var children = stage.children;
+        const children = stage.children;
         if (stage.content) {
           stage.content.removeChild(this.getNativeCanvasElement());
           stage.content.insertBefore(
@@ -182,9 +184,9 @@ export class Layer extends Container<Group | Shape> {
   // extend Node.prototype.moveToBottom
   moveToBottom() {
     if (Node.prototype.moveToBottom.call(this)) {
-      var stage = this.getStage();
+      const stage = this.getStage();
       if (stage) {
-        var children = stage.children;
+        const children = stage.children;
         if (stage.content) {
           stage.content.removeChild(this.getNativeCanvasElement());
           stage.content.insertBefore(
@@ -201,7 +203,7 @@ export class Layer extends Container<Group | Shape> {
     return this;
   }
   remove() {
-    var _canvas = this.getNativeCanvasElement();
+    const _canvas = this.getNativeCanvasElement();
 
     Node.prototype.remove.call(this);
 
@@ -220,13 +222,13 @@ export class Layer extends Container<Group | Shape> {
     return this;
   }
   _validateAdd(child) {
-    var type = child.getType();
+    const type = child.getType();
     if (type !== 'Group' && type !== 'Shape') {
       Util.throw('You may only add groups and shapes to a layer.');
     }
   }
   _toKonvaCanvas(config) {
-    config = config || {};
+    config = { ...config };
     config.width = config.width || this.getWidth();
     config.height = config.height || this.getHeight();
     config.x = config.x !== undefined ? config.x : this.x();
@@ -309,6 +311,7 @@ export class Layer extends Container<Group | Shape> {
    * get visible intersection shape. This is the preferred
    * method for determining if a point intersects a shape or not
    * also you may pass optional selector parameter to return ancestor of intersected shape
+   * nodes with listening set to false will not be detected
    * @method
    * @name Konva.Layer#getIntersection
    * @param {Object} pos
@@ -324,8 +327,8 @@ export class Layer extends Container<Group | Shape> {
     }
     // in some cases antialiased area may be bigger than 1px
     // it is possible if we will cache node, then scale it a lot
-    var spiralSearchDistance = 1;
-    var continueSearch = false;
+    let spiralSearchDistance = 1;
+    let continueSearch = false;
     while (true) {
       for (let i = 0; i < INTERSECTION_OFFSETS_LEN; i++) {
         const intersectionOffset = INTERSECTION_OFFSETS[i];
@@ -364,9 +367,10 @@ export class Layer extends Container<Group | Shape> {
     const p3 = p[3];
 
     // fully opaque pixel
+
     if (p3 === 255) {
-      const colorKey = Util._rgbToHex(p[0], p[1], p[2]);
-      const shape = shapes[HASH + colorKey];
+      const colorKey = Util.getHitColorKey(p[0], p[1], p[2]);
+      const shape = shapes[colorKey];
       if (shape) {
         return {
           shape: shape,
@@ -384,8 +388,8 @@ export class Layer extends Container<Group | Shape> {
     // empty pixel
     return {};
   }
-  drawScene(can?: SceneCanvas, top?: Node) {
-    var layer = this.getLayer(),
+  drawScene(can?: SceneCanvas, top?: Node, bufferCanvas?: SceneCanvas) {
+    const layer = this.getLayer(),
       canvas = can || (layer && layer.getCanvas());
 
     this._fire(BEFORE_DRAW, {
@@ -396,7 +400,7 @@ export class Layer extends Container<Group | Shape> {
       canvas.getContext().clear();
     }
 
-    Container.prototype.drawScene.call(this, canvas, top);
+    Container.prototype.drawScene.call(this, canvas, top, bufferCanvas);
 
     this._fire(DRAW, {
       node: this,
@@ -405,7 +409,7 @@ export class Layer extends Container<Group | Shape> {
     return this;
   }
   drawHit(can?: HitCanvas, top?: Node) {
-    var layer = this.getLayer(),
+    const layer = this.getLayer(),
       canvas = can || (layer && layer.hitCanvas);
 
     if (layer && layer.clearBeforeDraw()) {
@@ -459,8 +463,8 @@ export class Layer extends Container<Group | Shape> {
     if (!this.parent || !this.parent['content']) {
       return;
     }
-    var parent = this.parent as any;
-    var added = !!this.hitCanvas._canvas.parentNode;
+    const parent = this.parent as any;
+    const added = !!this.hitCanvas._canvas.parentNode;
     if (added) {
       parent.content.removeChild(this.hitCanvas._canvas);
     } else {

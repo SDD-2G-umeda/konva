@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
     "outDir": "lib",
-    "module": "CommonJS",
     "target": "ES2018",
+    "lib": ["ES2019", "dom"],
+    "module": "nodenext",
+    "noUncheckedSideEffectImports": true,
+    "rewriteRelativeImportExtensions": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     // "sourceMap": true,
     "noEmitOnError": true,
-    "lib": ["ES2015", "dom"],
-    "moduleResolution": "node",
     "declaration": true,
     "removeComments": false,
 
@@ -14,9 +18,14 @@
     "noImplicitAny": false,
     "noImplicitThis": false,
     "useUnknownInCatchVariables": false,
+    "skipLibCheck": true,
     // probably we would never enable this one
     // because it's too strict, konva generates many functions on the runtime
     "strictPropertyInitialization": false,
+    // our initializer `field: GetSet<string, this>` will cause `field` to
+    // be set to undefined if target>=ES2022, this also affects tools like `tsx` running locally
+    // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html#the-usedefineforclassfields-flag-and-the-declare-property-modifier
+    "useDefineForClassFields": false
   },
-  "include": ["./src/**/*.ts"]
+  "include": ["src"]
 }

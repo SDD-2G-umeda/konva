@@ -1,6 +1,6 @@
-import { Util } from './Util';
-import { Layer } from './Layer';
-import { _registerNode } from './Global';
+import { Util } from './Util.ts';
+import { Layer } from './Layer.ts';
+import { _registerNode } from './Global.ts';
 
 /**
  * FastLayer constructor. **DEPRECATED!** Please use `Konva.Layer({ listening: false})` instead. Layers are tied to their own canvas element and are used
@@ -11,7 +11,7 @@ import { _registerNode } from './Global';
  * @constructor
  * @memberof Konva
  * @augments Konva.Layer
- * @@containerParams
+ @@containerParams
  * @example
  * var layer = new Konva.FastLayer();
  */

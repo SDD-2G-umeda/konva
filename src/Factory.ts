@@ -1,36 +1,103 @@
-import { Node } from './Node';
-import { Util } from './Util';
-import { getComponentValidator } from './Validators';
+import type { Node } from './Node.ts';
+import type { GetSet } from './types.ts';
+import { Util } from './Util.ts';
+import { getComponentValidator } from './Validators.ts';
 
-var GET = 'get',
-  SET = 'set';
+const GET = 'get';
+const SET = 'set';
+
+/**
+ * Enforces that a type is a string.
+ */
+type EnforceString<T> = T extends string ? T : never;
+
+/**
+ * Represents a class.
+ */
+type Constructor = abstract new (...args: any) => any;
+
+/**
+ * An attribute of an instance of the provided class. Attributes names be strings.
+ */
+type Attr<T extends Constructor> = EnforceString<keyof InstanceType<T>>;
+
+/**
+ * A function that is called after a setter is called.
+ */
+type AfterFunc<T extends Constructor> = (this: InstanceType<T>) => void;
+
+/**
+ * Extracts the type of a GetSet.
+ */
+type ExtractGetSet<T> = T extends GetSet<infer U, any> ? U : never;
+
+/**
+ * Extracts the type of a GetSet class attribute.
+ */
+type Value<T extends Constructor, U extends Attr<T>> = ExtractGetSet<
+  InstanceType<T>[U]
+>;
+
+/**
+ * A function that validates a value.
+ */
+type ValidatorFunc<T> = (val: ExtractGetSet<T>, attr: string) => T;
+
+/**
+ * Extracts the "components" (keys) of a GetSet value. The value must be an object.
+ */
+type ExtractComponents<T extends Constructor, U extends Attr<T>> =
+  Value<T, U> extends Record<string, any>
+    ? EnforceString<keyof Value<T, U>>[]
+    : never;
 
 export const Factory = {
-  addGetterSetter(constructor, attr, def?, validator?, after?) {
+  addGetterSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    def?: Value<T, U>,
+    validator?: ValidatorFunc<Value<T, U>>,
+    after?: AfterFunc<T>
+  ): void {
     Factory.addGetter(constructor, attr, def);
     Factory.addSetter(constructor, attr, validator, after);
     Factory.addOverloadedGetterSetter(constructor, attr);
   },
-  addGetter(constructor, attr, def?) {
-    var method = GET + Util._capitalize(attr);
+  addGetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    def?: Value<T, U>
+  ) {
+    const method = GET + Util._capitalize(attr);
 
     constructor.prototype[method] =
       constructor.prototype[method] ||
       function (this: Node) {
-        var val = this.attrs[attr];
+        const val = this.attrs[attr];
         return val === undefined ? def : val;
       };
   },
 
-  addSetter(constructor, attr, validator?, after?) {
-    var method = SET + Util._capitalize(attr);
+  addSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    validator?: ValidatorFunc<Value<T, U>>,
+    after?: AfterFunc<T>
+  ) {
+    const method = SET + Util._capitalize(attr);
 
     if (!constructor.prototype[method]) {
       Factory.overWriteSetter(constructor, attr, validator, after);
     }
   },
-  overWriteSetter(constructor, attr, validator?, after?) {
-    var method = SET + Util._capitalize(attr);
+
+  overWriteSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    validator?: ValidatorFunc<Value<T, U>>,
+    after?: AfterFunc<T>
+  ) {
+    const method = SET + Util._capitalize(attr);
     constructor.prototype[method] = function (val) {
       if (validator && val !== undefined && val !== null) {
         val = validator.call(this, val, attr);
@@ -45,48 +112,46 @@ export const Factory = {
       return this;
     };
   },
-  addComponentsGetterSetter(
-    constructor,
-    attr: string,
-    components: Array<string>,
-    validator?: Function,
-    after?: Function
+
+  addComponentsGetterSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    components: ExtractComponents<T, U>,
+    validator?: ValidatorFunc<Value<T, U>>,
+    after?: AfterFunc<T>
   ) {
-    var len = components.length,
+    const len = components.length,
       capitalize = Util._capitalize,
       getter = GET + capitalize(attr),
-      setter = SET + capitalize(attr),
-      n,
-      component;
+      setter = SET + capitalize(attr);
 
     // getter
     constructor.prototype[getter] = function () {
-      var ret = {};
+      const ret: Record<string, any> = {};
 
-      for (n = 0; n < len; n++) {
-        component = components[n];
+      for (let n = 0; n < len; n++) {
+        const component = components[n];
         ret[component] = this.getAttr(attr + capitalize(component));
       }
 
       return ret;
     };
 
-    var basicValidator = getComponentValidator(components);
+    const basicValidator = getComponentValidator(components);
 
     // setter
     constructor.prototype[setter] = function (val) {
-      var oldVal = this.attrs[attr],
-        key;
+      const oldVal = this.attrs[attr];
 
       if (validator) {
-        val = validator.call(this, val);
+        val = validator.call(this, val, attr);
       }
 
       if (basicValidator) {
         basicValidator.call(this, val, attr);
       }
 
-      for (key in val) {
+      for (const key in val) {
         if (!val.hasOwnProperty(key)) {
           continue;
         }
@@ -109,8 +174,11 @@ export const Factory = {
 
     Factory.addOverloadedGetterSetter(constructor, attr);
   },
-  addOverloadedGetterSetter(constructor, attr) {
-    var capitalizedAttr = Util._capitalize(attr),
+  addOverloadedGetterSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U
+  ) {
+    const capitalizedAttr = Util._capitalize(attr),
       setter = SET + capitalizedAttr,
       getter = GET + capitalizedAttr;
 
@@ -124,17 +192,22 @@ export const Factory = {
       return this[getter]();
     };
   },
-  addDeprecatedGetterSetter(constructor, attr, def, validator) {
+  addDeprecatedGetterSetter<T extends Constructor, U extends Attr<T>>(
+    constructor: T,
+    attr: U,
+    def: Value<T, U>,
+    validator: ValidatorFunc<Value<T, U>>
+  ) {
     Util.error('Adding deprecated ' + attr);
 
-    var method = GET + Util._capitalize(attr);
+    const method = GET + Util._capitalize(attr);
 
-    var message =
+    const message =
       attr +
       ' property is deprecated and will be removed soon. Look at Konva change log for more information.';
     constructor.prototype[method] = function () {
       Util.error(message);
-      var val = this.attrs[attr];
+      const val = this.attrs[attr];
       return val === undefined ? def : val;
     };
     Factory.addSetter(constructor, attr, validator, function () {
@@ -142,11 +215,14 @@ export const Factory = {
     });
     Factory.addOverloadedGetterSetter(constructor, attr);
   },
-  backCompat(constructor, methods) {
+  backCompat<T extends Constructor>(
+    constructor: T,
+    methods: Record<string, string>
+  ) {
     Util.each(methods, function (oldMethodName, newMethodName) {
-      var method = constructor.prototype[newMethodName];
-      var oldGetter = GET + Util._capitalize(oldMethodName);
-      var oldSetter = SET + Util._capitalize(oldMethodName);
+      const method = constructor.prototype[newMethodName];
+      const oldGetter = GET + Util._capitalize(oldMethodName);
+      const oldSetter = SET + Util._capitalize(oldMethodName);
 
       function deprecated(this: Node) {
         method.apply(this, arguments);
@@ -164,7 +240,7 @@ export const Factory = {
       constructor.prototype[oldSetter] = deprecated;
     });
   },
-  afterSetFilter(this: Node) {
+  afterSetFilter(this: Node): void {
     this._filterUpToDate = false;
   },
 };

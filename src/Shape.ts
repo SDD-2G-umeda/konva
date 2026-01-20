@@ -1,21 +1,22 @@
-import { Konva } from './Global';
-import { Transform, Util } from './Util';
-import { Factory } from './Factory';
-import { Node, NodeConfig } from './Node';
+import { Konva } from './Global.ts';
+import { Transform, Util } from './Util.ts';
+import { Factory } from './Factory.ts';
+import type { NodeConfig } from './Node.ts';
+import { Node } from './Node.ts';
 import {
   getNumberValidator,
   getNumberOrAutoValidator,
   getStringValidator,
   getBooleanValidator,
   getStringOrGradientValidator,
-} from './Validators';
+} from './Validators.ts';
 
-import { Context, SceneContext } from './Context';
-import { _registerNode } from './Global';
-import * as PointerEvents from './PointerEvents';
+import type { Context, SceneContext } from './Context.ts';
+import { _registerNode } from './Global.ts';
+import * as PointerEvents from './PointerEvents.ts';
 
-import { GetSet, Vector2d } from './types';
-import { HitCanvas, SceneCanvas } from './Canvas';
+import type { GetSet, Vector2d } from './types.ts';
+import type { HitCanvas, SceneCanvas } from './Canvas.ts';
 
 // hack from here https://stackoverflow.com/questions/52667959/what-is-the-purpose-of-bivariancehack-in-typescript-types/52668133#52668133
 export type ShapeConfigHandler<TTarget> = {
@@ -25,8 +26,8 @@ export type ShapeConfigHandler<TTarget> = {
 export type LineJoin = 'round' | 'bevel' | 'miter';
 export type LineCap = 'butt' | 'round' | 'square';
 
-export interface ShapeConfig extends NodeConfig {
-  fill?: string;
+export type ShapeConfig = NodeConfig & {
+  fill?: string | CanvasGradient;
   fillPatternImage?: HTMLImageElement;
   fillPatternX?: number;
   fillPatternY?: number;
@@ -66,6 +67,7 @@ export interface ShapeConfig extends NodeConfig {
   strokeEnabled?: boolean;
   lineJoin?: LineJoin;
   lineCap?: LineCap;
+  miterLimit?: number;
   sceneFunc?: (con: Context, shape: Shape) => void;
   hitFunc?: (con: Context, shape: Shape) => void;
   shadowColor?: string;
@@ -80,7 +82,7 @@ export interface ShapeConfig extends NodeConfig {
   dashOffset?: number;
   dashEnabled?: boolean;
   perfectDrawEnabled?: boolean;
-}
+};
 
 export interface ShapeGetClientRectConfig {
   skipTransform?: boolean;
@@ -94,11 +96,11 @@ export type FillFuncOutput =
   | [Path2D | CanvasFillRule]
   | [Path2D, CanvasFillRule];
 
-var HAS_SHADOW = 'hasShadow';
-var SHADOW_RGBA = 'shadowRGBA';
-var patternImage = 'patternImage';
-var linearGradient = 'linearGradient';
-var radialGradient = 'radialGradient';
+const HAS_SHADOW = 'hasShadow';
+const SHADOW_RGBA = 'shadowRGBA';
+const patternImage = 'patternImage';
+const linearGradient = 'linearGradient';
+const radialGradient = 'radialGradient';
 
 let dummyContext: CanvasRenderingContext2D;
 function getDummyContext(): CanvasRenderingContext2D {
@@ -128,8 +130,13 @@ function _fillFunc(this: Node, context) {
 function _strokeFunc(context) {
   context.stroke();
 }
-function _fillFuncHit(context) {
-  context.fill();
+function _fillFuncHit(this: Node, context) {
+  const fillRule = this.attrs.fillRule;
+  if (fillRule) {
+    context.fill(fillRule);
+  } else {
+    context.fill();
+  }
 }
 function _strokeFuncHit(context) {
   context.stroke();
@@ -182,7 +189,7 @@ function _clearRadialGradientCache(this: Node) {
  *});
  */
 export class Shape<
-  Config extends ShapeConfig = ShapeConfig
+  Config extends ShapeConfig = ShapeConfig,
 > extends Node<Config> {
   _centroid: boolean;
   colorKey: string;
@@ -196,10 +203,19 @@ export class Shape<
     super(config);
     // set colorKey
     let key: string;
+    let attempts = 0;
 
     while (true) {
-      key = Util.getRandomColor();
+      key = Util.getHitColor();
       if (key && !(key in shapes)) {
+        break;
+      }
+      attempts++;
+      if (attempts >= 10000) {
+        Util.warn(
+          'Failed to find a unique color key for a shape. Konva may work incorrectly. Most likely your browser is using canvas farbling. Consider disabling it.'
+        );
+        key = Util.getRandomColor();
         break;
       }
     }
@@ -208,10 +224,16 @@ export class Shape<
     shapes[key] = this;
   }
 
+  /**
+   * @deprecated
+   */
   getContext() {
     Util.warn('shape.getContext() method is deprecated. Please do not use it.');
     return this.getLayer()!.getContext();
   }
+  /**
+   * @deprecated
+   */
   getCanvas() {
     Util.warn('shape.getCanvas() method is deprecated. Please do not use it.');
     return this.getLayer()!.getCanvas();
@@ -250,7 +272,7 @@ export class Shape<
   }
   __getFillPattern() {
     if (this.fillPatternImage()) {
-      var ctx = getDummyContext();
+      const ctx = getDummyContext();
       const pattern = ctx.createPattern(
         this.fillPatternImage(),
         this.fillPatternRepeat() || 'repeat'
@@ -289,16 +311,16 @@ export class Shape<
     return this._getCache(linearGradient, this.__getLinearGradient);
   }
   __getLinearGradient() {
-    var colorStops = this.fillLinearGradientColorStops();
+    const colorStops = this.fillLinearGradientColorStops();
     if (colorStops) {
-      var ctx = getDummyContext();
+      const ctx = getDummyContext();
 
-      var start = this.fillLinearGradientStartPoint();
-      var end = this.fillLinearGradientEndPoint();
-      var grd = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+      const start = this.fillLinearGradientStartPoint();
+      const end = this.fillLinearGradientEndPoint();
+      const grd = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
 
       // build color stops
-      for (var n = 0; n < colorStops.length; n += 2) {
+      for (let n = 0; n < colorStops.length; n += 2) {
         grd.addColorStop(colorStops[n] as number, colorStops[n + 1] as string);
       }
       return grd;
@@ -309,13 +331,13 @@ export class Shape<
     return this._getCache(radialGradient, this.__getRadialGradient);
   }
   __getRadialGradient() {
-    var colorStops = this.fillRadialGradientColorStops();
+    const colorStops = this.fillRadialGradientColorStops();
     if (colorStops) {
-      var ctx = getDummyContext();
+      const ctx = getDummyContext();
 
-      var start = this.fillRadialGradientStartPoint();
-      var end = this.fillRadialGradientEndPoint();
-      var grd = ctx.createRadialGradient(
+      const start = this.fillRadialGradientStartPoint();
+      const end = this.fillRadialGradientEndPoint();
+      const grd = ctx.createRadialGradient(
         start.x,
         start.y,
         this.fillRadialGradientStartRadius(),
@@ -325,7 +347,7 @@ export class Shape<
       );
 
       // build color stops
-      for (var n = 0; n < colorStops.length; n += 2) {
+      for (let n = 0; n < colorStops.length; n += 2) {
         grd.addColorStop(colorStops[n] as number, colorStops[n + 1] as string);
       }
       return grd;
@@ -338,7 +360,7 @@ export class Shape<
     if (!this.hasShadow()) {
       return;
     }
-    var rgba = Util.colorToRGBA(this.shadowColor());
+    const rgba = Util.colorToRGBA(this.shadowColor());
     if (rgba) {
       return (
         'rgba(' +
@@ -437,8 +459,8 @@ export class Shape<
    * @param {Number} point.y
    * @returns {Boolean}
    */
-  intersects(point) {
-    var stage = this.getStage();
+  intersects(point: Vector2d) {
+    const stage = this.getStage();
     if (!stage) {
       return false;
     }
@@ -519,7 +541,7 @@ export class Shape<
    *
    */
   getSelfRect() {
-    var size = this.size();
+    const size = this.size();
     return {
       x: this._centroid ? -size.width / 2 : 0,
       y: this._centroid ? -size.height / 2 : 0,
@@ -528,9 +550,22 @@ export class Shape<
     };
   }
   getClientRect(config: ShapeGetClientRectConfig = {}) {
+    // if we have a cached parent, it will use cached transform matrix
+    // but we don't want to that
+    let hasCachedParent = false;
+    let parent = this.getParent();
+    while (parent) {
+      if (parent.isCached()) {
+        hasCachedParent = true;
+        break;
+      }
+      parent = parent.getParent();
+    }
     const skipTransform = config.skipTransform;
 
-    const relativeTo = config.relativeTo;
+    // force relative to stage if we have a cached parent
+    const relativeTo =
+      config.relativeTo || (hasCachedParent && this.getStage()) || undefined;
 
     const fillRect = this.getSelfRect();
 
@@ -575,17 +610,16 @@ export class Shape<
     // 2 - when we are caching current
     // 3 - when node is cached and we need to draw it into layer
 
-    var layer = this.getLayer();
-    var canvas = can || layer!.getCanvas(),
+    const layer = this.getLayer();
+    const canvas = can || layer!.getCanvas(),
       context = canvas.getContext() as SceneContext,
       cachedCanvas = this._getCanvasCache(),
       drawFunc = this.getSceneFunc(),
-      hasShadow = this.hasShadow(),
-      stage,
-      bufferContext;
+      hasShadow = this.hasShadow();
+    let stage;
 
-    var skipBuffer = canvas.isCache;
-    var cachingSelf = top === this;
+    const skipBuffer = false;
+    const cachingSelf = top === this;
 
     if (!this.isVisible() && !cachingSelf) {
       return this;
@@ -594,7 +628,7 @@ export class Shape<
     if (cachedCanvas) {
       context.save();
 
-      var m = this.getAbsoluteTransform(top).getMatrix();
+      const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       this._drawCachedSceneCanvas(context);
       context.restore();
@@ -610,33 +644,66 @@ export class Shape<
     if (this._useBufferCanvas() && !skipBuffer) {
       stage = this.getStage();
       const bc = bufferCanvas || stage.bufferCanvas;
-      bufferContext = bc.getContext();
-      bufferContext.clear();
+      const bufferContext = bc.getContext();
+      // When caching, the buffer canvas may have a translation applied.
+      // We need to reset the transform before clearing to ensure the entire canvas is cleared.
+      if (bufferCanvas) {
+        bufferContext.save();
+        bufferContext.setTransform(1, 0, 0, 1, 0, 0);
+        bufferContext.clearRect(0, 0, bc.width, bc.height);
+        bufferContext.restore();
+      } else {
+        bufferContext.clear();
+      }
       bufferContext.save();
       bufferContext._applyLineJoin(this);
+      bufferContext._applyMiterLimit(this);
       // layer might be undefined if we are using cache before adding to layer
-      var o = this.getAbsoluteTransform(top).getMatrix();
+      const o = this.getAbsoluteTransform(top).getMatrix();
       bufferContext.transform(o[0], o[1], o[2], o[3], o[4], o[5]);
+
+      // Apply CSS filters to buffer context if not cached
+      // we skip filters in non cache use cases for now
+      // if (!cachingSelf && filters?.length > 0) {
+      //   bufferContext._applyCSSFilters(this);
+      // }
 
       drawFunc.call(this, bufferContext, this);
       bufferContext.restore();
 
-      var ratio = bc.pixelRatio;
+      const ratio = bc.pixelRatio;
 
       if (hasShadow) {
         context._applyShadow(this);
       }
-      context._applyOpacity(this);
-      context._applyGlobalCompositeOperation(this);
-      context.drawImage(bc._canvas, 0, 0, bc.width / ratio, bc.height / ratio);
+      // if we are caching self, we don't need to apply opacity and global composite operation
+      // because it will be applied in the cache
+      if (!cachingSelf) {
+        context._applyOpacity(this);
+        context._applyGlobalCompositeOperation(this);
+      }
+
+      context.drawImage(
+        bc._canvas,
+        bc.x || 0,
+        bc.y || 0,
+        bc.width / ratio,
+        bc.height / ratio
+      );
     } else {
       context._applyLineJoin(this);
+      context._applyMiterLimit(this);
 
       if (!cachingSelf) {
-        var o = this.getAbsoluteTransform(top).getMatrix();
+        const o = this.getAbsoluteTransform(top).getMatrix();
         context.transform(o[0], o[1], o[2], o[3], o[4], o[5]);
         context._applyOpacity(this);
         context._applyGlobalCompositeOperation(this);
+
+        // Apply CSS filters to main context if not cached
+        // if (filters?.length) {
+        //   context._applyCSSFilters(this);
+        // }
       }
 
       if (hasShadow) {
@@ -653,7 +720,7 @@ export class Shape<
       return this;
     }
 
-    var layer = this.getLayer(),
+    const layer = this.getLayer(),
       canvas = can || layer!.hitCanvas,
       context = canvas && canvas.getContext(),
       drawFunc = this.hitFunc() || this.sceneFunc(),
@@ -669,7 +736,7 @@ export class Shape<
     if (cachedHitCanvas) {
       context.save();
 
-      var m = this.getAbsoluteTransform(top).getMatrix();
+      const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
 
       this._drawCachedHitCanvas(context);
@@ -681,10 +748,11 @@ export class Shape<
     }
     context.save();
     context._applyLineJoin(this);
+    context._applyMiterLimit(this);
 
     const selfCache = this === top;
     if (!selfCache) {
-      var o = this.getAbsoluteTransform(top).getMatrix();
+      const o = this.getAbsoluteTransform(top).getMatrix();
       context.transform(o[0], o[1], o[2], o[3], o[4], o[5]);
     }
     drawFunc.call(this, context, this);
@@ -704,31 +772,25 @@ export class Shape<
    * shape.drawHitFromCache();
    */
   drawHitFromCache(alphaThreshold = 0) {
-    var cachedCanvas = this._getCanvasCache(),
+    const cachedCanvas = this._getCanvasCache(),
       sceneCanvas = this._getCachedSceneCanvas(),
       hitCanvas = cachedCanvas.hit,
       hitContext = hitCanvas.getContext(),
       hitWidth = hitCanvas.getWidth(),
-      hitHeight = hitCanvas.getHeight(),
-      hitImageData,
-      hitData,
-      len,
-      rgbColorKey,
-      i,
-      alpha;
+      hitHeight = hitCanvas.getHeight();
 
     hitContext.clear();
     hitContext.drawImage(sceneCanvas._canvas, 0, 0, hitWidth, hitHeight);
 
     try {
-      hitImageData = hitContext.getImageData(0, 0, hitWidth, hitHeight);
-      hitData = hitImageData.data;
-      len = hitData.length;
-      rgbColorKey = Util._hexToRgb(this.colorKey);
+      const hitImageData = hitContext.getImageData(0, 0, hitWidth, hitHeight);
+      const hitData = hitImageData.data;
+      const len = hitData.length;
+      const rgbColorKey = Util._hexToRgb(this.colorKey);
 
       // replace non transparent pixels with color key
-      for (i = 0; i < len; i += 4) {
-        alpha = hitData[i + 3];
+      for (let i = 0; i < len; i += 4) {
+        const alpha = hitData[i + 3];
         if (alpha > alphaThreshold) {
           hitData[i] = rgbColorKey.r;
           hitData[i + 1] = rgbColorKey.g;
@@ -766,7 +828,7 @@ export class Shape<
   dash: GetSet<number[], this>;
   dashEnabled: GetSet<boolean, this>;
   dashOffset: GetSet<number, this>;
-  fill: GetSet<string, this>;
+  fill: GetSet<string | CanvasGradient, this>;
   fillEnabled: GetSet<boolean, this>;
   fillLinearGradientColorStops: GetSet<Array<number | string>, this>;
   fillLinearGradientStartPoint: GetSet<Vector2d, this>;
@@ -805,6 +867,7 @@ export class Shape<
   hitFunc: GetSet<ShapeConfigHandler<this>, this>;
   lineCap: GetSet<LineCap, this>;
   lineJoin: GetSet<LineJoin, this>;
+  miterLimit: GetSet<number, this>;
   perfectDrawEnabled: GetSet<boolean, this>;
   sceneFunc: GetSet<ShapeConfigHandler<this>, this>;
   shadowColor: GetSet<string, this>;
@@ -815,7 +878,7 @@ export class Shape<
   shadowOffsetY: GetSet<number, this>;
   shadowOpacity: GetSet<number, this>;
   shadowBlur: GetSet<number, this>;
-  stroke: GetSet<string, this>;
+  stroke: GetSet<string | CanvasGradient, this>;
   strokeEnabled: GetSet<boolean, this>;
   fillAfterStrokeEnabled: GetSet<boolean, this>;
   strokeScaleEnabled: GetSet<boolean, this>;
@@ -825,6 +888,11 @@ export class Shape<
   strokeLinearGradientStartPoint: GetSet<Vector2d, this>;
   strokeLinearGradientEndPoint: GetSet<Vector2d, this>;
   strokeLinearGradientColorStops: GetSet<Array<number | string>, this>;
+  strokeLinearGradientStartPointX: GetSet<number, this>;
+  strokeLinearGradientStartPointY: GetSet<number, this>;
+  strokeLinearGradientEndPointX: GetSet<number, this>;
+  strokeLinearGradientEndPointY: GetSet<number, this>;
+  fillRule: GetSet<CanvasFillRule, this>;
 }
 
 Shape.prototype._fillFunc = _fillFunc;
@@ -1054,6 +1122,22 @@ Factory.addGetterSetter(Shape, 'lineCap');
  *
  * // set line cap
  * shape.lineCap('round');
+ */
+
+Factory.addGetterSetter(Shape, 'miterLimit');
+
+/**
+ * get/set miterLimit.
+ * @name Konva.Shape#miterLimit
+ * @method
+ * @param {Number} miterLimit
+ * @returns {Number}
+ * @example
+ * // get miter limit
+ * var miterLimit = shape.miterLimit();
+ *
+ * // set miter limit
+ * shape.miterLimit(10);
  */
 
 Factory.addGetterSetter(Shape, 'sceneFunc');

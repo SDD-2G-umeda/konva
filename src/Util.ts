@@ -1,6 +1,26 @@
-import { Konva } from './Global';
-import { Context } from './Context';
-import { IRect, RGB, RGBA, Vector2d } from './types';
+import { Konva } from './Global.ts';
+import type { Context } from './Context.ts';
+import type { IRect, RGB, Vector2d } from './types.ts';
+
+const NODE_ERROR = `Konva.js unsupported environment.
+
+Looks like you are trying to use Konva.js in Node.js environment. because "document" object is undefined.
+
+To use Konva.js in Node.js environment, you need to use the "canvas-backend" or "skia-backend" module.
+
+bash: npm install canvas
+js: import "konva/canvas-backend";
+
+or
+
+bash: npm install skia-canvas
+js: import "konva/skia-backend";
+`;
+const ensureBrowser = () => {
+  if (typeof document === 'undefined') {
+    throw new Error(NODE_ERROR);
+  }
+};
 
 /*
  * Last updated November 2011
@@ -67,7 +87,7 @@ export class Transform {
    * @returns {Object} 2D point(x, y)
    */
   point(point: Vector2d) {
-    var m = this.m;
+    const m = this.m;
     return {
       x: m[0] * point.x + m[2] * point.y + m[4],
       y: m[1] * point.x + m[3] * point.y + m[5],
@@ -109,12 +129,12 @@ export class Transform {
    * @returns {Konva.Transform}
    */
   rotate(rad: number) {
-    var c = Math.cos(rad);
-    var s = Math.sin(rad);
-    var m11 = this.m[0] * c + this.m[2] * s;
-    var m12 = this.m[1] * c + this.m[3] * s;
-    var m21 = this.m[0] * -s + this.m[2] * c;
-    var m22 = this.m[1] * -s + this.m[3] * c;
+    const c = Math.cos(rad);
+    const s = Math.sin(rad);
+    const m11 = this.m[0] * c + this.m[2] * s;
+    const m12 = this.m[1] * c + this.m[3] * s;
+    const m21 = this.m[0] * -s + this.m[2] * c;
+    const m22 = this.m[1] * -s + this.m[3] * c;
     this.m[0] = m11;
     this.m[1] = m12;
     this.m[2] = m21;
@@ -142,10 +162,10 @@ export class Transform {
    * @returns {Konva.Transform}
    */
   skew(sx: number, sy: number) {
-    var m11 = this.m[0] + this.m[2] * sy;
-    var m12 = this.m[1] + this.m[3] * sy;
-    var m21 = this.m[2] + this.m[0] * sx;
-    var m22 = this.m[3] + this.m[1] * sx;
+    const m11 = this.m[0] + this.m[2] * sy;
+    const m12 = this.m[1] + this.m[3] * sy;
+    const m21 = this.m[2] + this.m[0] * sx;
+    const m22 = this.m[3] + this.m[1] * sx;
     this.m[0] = m11;
     this.m[1] = m12;
     this.m[2] = m21;
@@ -160,14 +180,14 @@ export class Transform {
    * @returns {Konva.Transform}
    */
   multiply(matrix: Transform) {
-    var m11 = this.m[0] * matrix.m[0] + this.m[2] * matrix.m[1];
-    var m12 = this.m[1] * matrix.m[0] + this.m[3] * matrix.m[1];
+    const m11 = this.m[0] * matrix.m[0] + this.m[2] * matrix.m[1];
+    const m12 = this.m[1] * matrix.m[0] + this.m[3] * matrix.m[1];
 
-    var m21 = this.m[0] * matrix.m[2] + this.m[2] * matrix.m[3];
-    var m22 = this.m[1] * matrix.m[2] + this.m[3] * matrix.m[3];
+    const m21 = this.m[0] * matrix.m[2] + this.m[2] * matrix.m[3];
+    const m22 = this.m[1] * matrix.m[2] + this.m[3] * matrix.m[3];
 
-    var dx = this.m[0] * matrix.m[4] + this.m[2] * matrix.m[5] + this.m[4];
-    var dy = this.m[1] * matrix.m[4] + this.m[3] * matrix.m[5] + this.m[5];
+    const dx = this.m[0] * matrix.m[4] + this.m[2] * matrix.m[5] + this.m[4];
+    const dy = this.m[1] * matrix.m[4] + this.m[3] * matrix.m[5] + this.m[5];
 
     this.m[0] = m11;
     this.m[1] = m12;
@@ -184,13 +204,13 @@ export class Transform {
    * @returns {Konva.Transform}
    */
   invert() {
-    var d = 1 / (this.m[0] * this.m[3] - this.m[1] * this.m[2]);
-    var m0 = this.m[3] * d;
-    var m1 = -this.m[1] * d;
-    var m2 = -this.m[2] * d;
-    var m3 = this.m[0] * d;
-    var m4 = d * (this.m[2] * this.m[5] - this.m[3] * this.m[4]);
-    var m5 = d * (this.m[1] * this.m[4] - this.m[0] * this.m[5]);
+    const d = 1 / (this.m[0] * this.m[3] - this.m[1] * this.m[2]);
+    const m0 = this.m[3] * d;
+    const m1 = -this.m[1] * d;
+    const m2 = -this.m[2] * d;
+    const m3 = this.m[0] * d;
+    const m4 = d * (this.m[2] * this.m[5] - this.m[3] * this.m[4]);
+    const m5 = d * (this.m[1] * this.m[4] - this.m[0] * this.m[5]);
     this.m[0] = m0;
     this.m[1] = m1;
     this.m[2] = m2;
@@ -214,16 +234,16 @@ export class Transform {
    * @returns {Konva.Transform}
    */
   decompose() {
-    var a = this.m[0];
-    var b = this.m[1];
-    var c = this.m[2];
-    var d = this.m[3];
-    var e = this.m[4];
-    var f = this.m[5];
+    const a = this.m[0];
+    const b = this.m[1];
+    const c = this.m[2];
+    const d = this.m[3];
+    const e = this.m[4];
+    const f = this.m[5];
 
-    var delta = a * d - b * c;
+    const delta = a * d - b * c;
 
-    let result = {
+    const result = {
       x: e,
       y: f,
       rotation: 0,
@@ -235,14 +255,14 @@ export class Transform {
 
     // Apply the QR-like decomposition.
     if (a != 0 || b != 0) {
-      var r = Math.sqrt(a * a + b * b);
+      const r = Math.sqrt(a * a + b * b);
       result.rotation = b > 0 ? Math.acos(a / r) : -Math.acos(a / r);
       result.scaleX = r;
       result.scaleY = delta / r;
       result.skewX = (a * c + b * d) / delta;
       result.skewY = 0;
     } else if (c != 0 || d != 0) {
-      var s = Math.sqrt(c * c + d * d);
+      const s = Math.sqrt(c * c + d * d);
       result.rotation =
         Math.PI / 2 - (d > 0 ? Math.acos(-c / s) : -Math.acos(c / s));
       result.scaleX = delta / s;
@@ -260,7 +280,7 @@ export class Transform {
 }
 
 // CONSTANTS
-var OBJECT_ARRAY = '[object Array]',
+const OBJECT_ARRAY = '[object Array]',
   OBJECT_NUMBER = '[object Number]',
   OBJECT_STRING = '[object String]',
   OBJECT_BOOLEAN = '[object Boolean]',
@@ -423,13 +443,16 @@ var OBJECT_ARRAY = '[object Array]',
     yellow: [255, 255, 0],
     yellowgreen: [154, 205, 5],
   },
-  RGB_REGEX = /rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\)/,
-  animQueue: Array<Function> = [];
+  RGB_REGEX = /rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\)/;
+let animQueue: Array<Function> = [];
+
+// Cache for canvas farbling detection
+let _isCanvasFarblingActive: boolean | null = null;
 
 const req =
   (typeof requestAnimationFrame !== 'undefined' && requestAnimationFrame) ||
   function (f) {
-    setTimeout(f, 60);
+    setTimeout(f, 16); // 60fps ≈ 16.67ms per frame
   };
 /**
  * @namespace Util
@@ -465,14 +488,14 @@ export const Util = {
     return Object.prototype.toString.call(obj) === OBJECT_BOOLEAN;
   },
   // arrays are objects too
-  isObject(val: any): val is Object {
+  isObject(val: any): val is object {
     return val instanceof Object;
   },
   isValidSelector(selector: any) {
     if (typeof selector !== 'string') {
       return false;
     }
-    var firstChar = selector[0];
+    const firstChar = selector[0];
     return (
       firstChar === '#' ||
       firstChar === '.' ||
@@ -505,14 +528,16 @@ export const Util = {
     }
   },
   createCanvasElement() {
-    var canvas = document.createElement('canvas');
+    ensureBrowser();
+    const canvas = document.createElement('canvas');
     // on some environments canvas.style is readonly
     try {
-      (<any>canvas).style = canvas.style || {};
+      (canvas as any).style = canvas.style || {};
     } catch (e) {}
     return canvas;
   },
   createImageElement() {
+    ensureBrowser();
     return document.createElement('img');
   },
   _isInDocument(el: any) {
@@ -529,7 +554,7 @@ export const Util = {
    */
   _urlToImage(url: string, callback: Function) {
     // if arg is a string, then it's a data url
-    var imageObj = Util.createImageElement();
+    const imageObj = Util.createImageElement();
     imageObj.onload = function () {
       callback(imageObj);
     };
@@ -540,7 +565,7 @@ export const Util = {
   },
   _hexToRgb(hex: string): RGB {
     hex = hex.replace(HASH, EMPTY_STRING);
-    var bigint = parseInt(hex, 16);
+    const bigint = parseInt(hex, 16);
     return {
       r: (bigint >> 16) & 255,
       g: (bigint >> 8) & 255,
@@ -555,11 +580,103 @@ export const Util = {
    * shape.fill(Konva.Util.getRandomColor());
    */
   getRandomColor() {
-    var randColor = ((Math.random() * 0xffffff) << 0).toString(16);
+    let randColor = ((Math.random() * 0xffffff) << 0).toString(16);
     while (randColor.length < 6) {
       randColor = ZERO + randColor;
     }
     return HASH + randColor;
+  },
+  /**
+   * Check if canvas farbling is active (e.g., Brave browser fingerprinting protection)
+   * @method
+   * @memberof Konva.Util
+   * @returns {Boolean}
+   */
+  isCanvasFarblingActive() {
+    if (_isCanvasFarblingActive !== null) {
+      return _isCanvasFarblingActive;
+    }
+
+    if (typeof document === 'undefined') {
+      _isCanvasFarblingActive = false;
+      return false;
+    }
+
+    const c = this.createCanvasElement();
+    c.width = 10;
+    c.height = 10;
+    const ctx = c.getContext('2d', {
+      willReadFrequently: true,
+    }) as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, 10, 10);
+
+    ctx.fillStyle = '#282828'; // 40, 40, 40
+    ctx.fillRect(0, 0, 10, 10);
+
+    const d = ctx.getImageData(0, 0, 10, 10).data;
+    let isFarbling = false;
+    for (let i = 0; i < 100; i++) {
+      if (
+        d[i * 4] !== 40 ||
+        d[i * 4 + 1] !== 40 ||
+        d[i * 4 + 2] !== 40 ||
+        d[i * 4 + 3] !== 255
+      ) {
+        isFarbling = true;
+        break;
+      }
+    }
+
+    _isCanvasFarblingActive = isFarbling;
+    this.releaseCanvas(c);
+    return _isCanvasFarblingActive;
+  },
+  /**
+   * Get a random color for hit detection (normalized if farbling is active)
+   * @method
+   * @memberof Konva.Util
+   * @returns {String} hex color string
+   */
+  getHitColor(): string {
+    const color = this.getRandomColor();
+    return this.isCanvasFarblingActive()
+      ? this.getSnappedHexColor(color)
+      : color;
+  },
+  /**
+   * Get hit color key from RGB values (normalized if farbling is active)
+   * @method
+   * @memberof Konva.Util
+   * @param {Number} r - red component (0-255)
+   * @param {Number} g - green component (0-255)
+   * @param {Number} b - blue component (0-255)
+   * @returns {String} hex color key string
+   */
+  getHitColorKey(r: number, g: number, b: number): string {
+    if (this.isCanvasFarblingActive()) {
+      r = Math.round(r / 5) * 5;
+      g = Math.round(g / 5) * 5;
+      b = Math.round(b / 5) * 5;
+    }
+    return HASH + this._rgbToHex(r, g, b);
+  },
+  /**
+   * Snap hex color values to end with 0 (normalize for canvas farbling)
+   * @method
+   * @memberof Konva.Util
+   * @param {String} hex - hex color string (e.g., "#ff00ff")
+   * @returns {String} normalized hex color string
+   */
+  getSnappedHexColor(hex: string): string {
+    const rgb = this._hexToRgb(hex);
+    return (
+      HASH +
+      this._rgbToHex(
+        Math.round(rgb.r / 5) * 5,
+        Math.round(rgb.g / 5) * 5,
+        Math.round(rgb.b / 5) * 5
+      )
+    );
   },
 
   /**
@@ -574,7 +691,7 @@ export const Util = {
    * var rgb = Konva.Util.getRGB('rgb(0,0,255)');
    */
   getRGB(color: string): RGB {
-    var rgb;
+    let rgb;
     // color string
     if (color in COLORS) {
       rgb = COLORS[color as keyof typeof COLORS];
@@ -620,7 +737,7 @@ export const Util = {
   },
   // Parse named css color. Like "green"
   _namedColorToRBA(str: string) {
-    var c = COLORS[str.toLowerCase() as keyof typeof COLORS];
+    const c = COLORS[str.toLowerCase() as keyof typeof COLORS];
     if (!c) {
       return null;
     }
@@ -635,7 +752,7 @@ export const Util = {
   _rgbColorToRGBA(str: string) {
     if (str.indexOf('rgb(') === 0) {
       str = str.match(/rgb\(([^)]+)\)/)![1];
-      var parts = str.split(/ *, */).map(Number);
+      const parts = str.split(/ *, */).map(Number);
       return {
         r: parts[0],
         g: parts[1],
@@ -648,7 +765,7 @@ export const Util = {
   _rgbaColorToRGBA(str: string) {
     if (str.indexOf('rgba(') === 0) {
       str = str.match(/rgba\(([^)]+)\)/)![1]!;
-      var parts = str.split(/ *, */).map((n, index) => {
+      const parts = str.split(/ *, */).map((n, index) => {
         if (n.slice(-1) === '%') {
           return index === 3 ? parseInt(n) / 100 : (parseInt(n) / 100) * 255;
         }
@@ -789,8 +906,8 @@ export const Util = {
     );
   },
   cloneObject<Any>(obj: Any): Any {
-    var retObj: any = {};
-    for (var key in obj) {
+    const retObj: any = {};
+    for (const key in obj) {
       if (this._isPlainObject(obj[key])) {
         retObj[key] = this.cloneObject(obj[key]);
       } else if (this._isArray(obj[key])) {
@@ -840,8 +957,8 @@ export const Util = {
     }
     console.warn(KONVA_WARNING + str);
   },
-  each(obj: Object, func: Function) {
-    for (var key in obj) {
+  each(obj: object, func: Function) {
+    for (const key in obj) {
       func(key, obj[key as keyof typeof obj]);
     }
   },
@@ -849,15 +966,15 @@ export const Util = {
     return left <= val && val < right;
   },
   _getProjectionToSegment(x1, y1, x2, y2, x3, y3) {
-    var x, y, dist;
+    let x, y, dist;
 
-    var pd2 = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+    const pd2 = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
     if (pd2 == 0) {
       x = x1;
       y = y1;
       dist = (x3 - x2) * (x3 - x2) + (y3 - y2) * (y3 - y2);
     } else {
-      var u = ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1)) / pd2;
+      const u = ((x3 - x1) * (x2 - x1) + (y3 - y1) * (y2 - y1)) / pd2;
       if (u < 0) {
         x = x1;
         y = y1;
@@ -877,14 +994,14 @@ export const Util = {
   // line as array of points.
   // line might be closed
   _getProjectionToLine(pt: Vector2d, line: Array<Vector2d>, isClosed: boolean) {
-    var pc = Util.cloneObject(pt);
-    var dist = Number.MAX_VALUE;
+    const pc = Util.cloneObject(pt);
+    let dist = Number.MAX_VALUE;
     line.forEach(function (p1, i) {
       if (!isClosed && i === line.length - 1) {
         return;
       }
-      var p2 = line[(i + 1) % line.length];
-      var proj = Util._getProjectionToSegment(
+      const p2 = line[(i + 1) % line.length];
+      const proj = Util._getProjectionToSegment(
         p1.x,
         p1.y,
         p2.x,
@@ -892,7 +1009,7 @@ export const Util = {
         pt.x,
         pt.y
       );
-      var px = proj[0],
+      const px = proj[0],
         py = proj[1],
         pdist = proj[2];
       if (pdist < dist) {
@@ -904,41 +1021,40 @@ export const Util = {
     return pc;
   },
   _prepareArrayForTween(startArray, endArray, isClosed) {
-    var n,
-      start: Vector2d[] = [],
+    const start: Vector2d[] = [],
       end: Vector2d[] = [];
     if (startArray.length > endArray.length) {
-      var temp = endArray;
+      const temp = endArray;
       endArray = startArray;
       startArray = temp;
     }
-    for (n = 0; n < startArray.length; n += 2) {
+    for (let n = 0; n < startArray.length; n += 2) {
       start.push({
         x: startArray[n],
         y: startArray[n + 1],
       });
     }
-    for (n = 0; n < endArray.length; n += 2) {
+    for (let n = 0; n < endArray.length; n += 2) {
       end.push({
         x: endArray[n],
         y: endArray[n + 1],
       });
     }
 
-    var newStart: number[] = [];
+    const newStart: number[] = [];
     end.forEach(function (point) {
-      var pr = Util._getProjectionToLine(point, start, isClosed);
+      const pr = Util._getProjectionToLine(point, start, isClosed);
       newStart.push(pr.x);
       newStart.push(pr.y);
     });
     return newStart;
   },
   _prepareToStringify<T>(obj: any): T | null {
-    var desc;
+    let desc;
 
     obj.visitedByCircularReferenceRemoval = true;
 
-    for (var key in obj) {
+    for (const key in obj) {
       if (
         !(obj.hasOwnProperty(key) && obj[key] && typeof obj[key] == 'object')
       ) {
@@ -969,8 +1085,8 @@ export const Util = {
   },
   // very simplified version of Object.assign
   _assign<T, U>(target: T, source: U) {
-    for (var key in source) {
-      (<any>target)[key] = source[key];
+    for (const key in source) {
+      (target as any)[key] = source[key];
     }
     return target as T & U;
   },
@@ -996,6 +1112,11 @@ export const Util = {
     height: number,
     cornerRadius: number | number[]
   ) {
+    // if negative dimensions, abs width/height and move rectangle
+    let xOrigin = width < 0 ? width : 0;
+    let yOrigin = height < 0 ? height : 0;
+    width = Math.abs(width);
+    height = Math.abs(height);
     let topLeft = 0;
     let topRight = 0;
     let bottomLeft = 0;
@@ -1012,35 +1133,88 @@ export const Util = {
       bottomRight = Math.min(cornerRadius[2] || 0, width / 2, height / 2);
       bottomLeft = Math.min(cornerRadius[3] || 0, width / 2, height / 2);
     }
-    context.moveTo(topLeft, 0);
-    context.lineTo(width - topRight, 0);
+    context.moveTo(xOrigin + topLeft, yOrigin);
+    context.lineTo(xOrigin + width - topRight, yOrigin);
     context.arc(
-      width - topRight,
-      topRight,
+      xOrigin + width - topRight,
+      yOrigin + topRight,
       topRight,
       (Math.PI * 3) / 2,
       0,
       false
     );
-    context.lineTo(width, height - bottomRight);
+    context.lineTo(xOrigin + width, yOrigin + height - bottomRight);
     context.arc(
-      width - bottomRight,
-      height - bottomRight,
+      xOrigin + width - bottomRight,
+      yOrigin + height - bottomRight,
       bottomRight,
       0,
       Math.PI / 2,
       false
     );
-    context.lineTo(bottomLeft, height);
+    context.lineTo(xOrigin + bottomLeft, yOrigin + height);
     context.arc(
-      bottomLeft,
-      height - bottomLeft,
+      xOrigin + bottomLeft,
+      yOrigin + height - bottomLeft,
       bottomLeft,
       Math.PI / 2,
       Math.PI,
       false
     );
-    context.lineTo(0, topLeft);
-    context.arc(topLeft, topLeft, topLeft, Math.PI, (Math.PI * 3) / 2, false);
+    context.lineTo(xOrigin, yOrigin + topLeft);
+    context.arc(
+      xOrigin + topLeft,
+      yOrigin + topLeft,
+      topLeft,
+      Math.PI,
+      (Math.PI * 3) / 2,
+      false
+    );
+  },
+  drawRoundedPolygonPath(
+    context: Context,
+    points: Vector2d[],
+    sides: number,
+    radius: number,
+    cornerRadius: number | number[]
+  ) {
+    radius = Math.abs(radius);
+    for (let i = 0; i < sides; i++) {
+      const prev = points[(i - 1 + sides) % sides];
+      const curr = points[i];
+      const next = points[(i + 1) % sides];
+      const vec1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+      const vec2 = { x: next.x - curr.x, y: next.y - curr.y };
+      const len1 = Math.hypot(vec1.x, vec1.y);
+      const len2 = Math.hypot(vec2.x, vec2.y);
+      let currCornerRadius;
+      if (typeof cornerRadius === 'number') {
+        currCornerRadius = cornerRadius;
+      } else {
+        currCornerRadius = i < cornerRadius.length ? cornerRadius[i] : 0;
+      }
+      const maxCornerRadius = radius * Math.cos(Math.PI / sides);
+      // cornerRadius creates perfect circle at 1/2 radius
+      currCornerRadius =
+        maxCornerRadius * Math.min(1, (currCornerRadius / radius) * 2);
+      const normalVec1 = { x: vec1.x / len1, y: vec1.y / len1 };
+      const normalVec2 = { x: vec2.x / len2, y: vec2.y / len2 };
+      const p1 = {
+        x: curr.x - normalVec1.x * currCornerRadius,
+        y: curr.y - normalVec1.y * currCornerRadius,
+      };
+      const p2 = {
+        x: curr.x + normalVec2.x * currCornerRadius,
+        y: curr.y + normalVec2.y * currCornerRadius,
+      };
+      if (i === 0) {
+        context.moveTo(p1.x, p1.y);
+      } else {
+        context.lineTo(p1.x, p1.y);
+      }
+      context.arcTo(curr.x, curr.y, p2.x, p2.y, currCornerRadius);
+    }
   },
 };
+
+export type AnyString<T> = T | (string & {});

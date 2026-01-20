@@ -1,14 +1,15 @@
-import { Util } from '../Util';
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { _registerNode } from '../Global';
+import { Util } from '../Util.ts';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { _registerNode } from '../Global.ts';
 import {
   getNumberOrArrayOfNumbersValidator,
   getNumberValidator,
-} from '../Validators';
+} from '../Validators.ts';
 
-import { GetSet, IRect } from '../types';
-import { Context } from '../Context';
+import type { GetSet, IRect } from '../types.ts';
+import type { Context } from '../Context.ts';
 
 export interface ImageConfig extends ShapeConfig {
   image: CanvasImageSource | undefined;
@@ -40,9 +41,16 @@ export interface ImageConfig extends ShapeConfig {
  * imageObj.src = '/path/to/image.jpg'
  */
 export class Image extends Shape<ImageConfig> {
-  constructor(attrs: ImageConfig) {
+  private _loadListener: () => void;
+
+  constructor(attrs?: ImageConfig) {
     super(attrs);
-    this.on('imageChange.konva', () => {
+    this._loadListener = () => {
+      this._requestDraw();
+    };
+
+    this.on('imageChange.konva', (props: any) => {
+      this._removeImageLoad(props.oldVal);
       this._setImageLoad();
     });
 
@@ -59,12 +67,25 @@ export class Image extends Shape<ImageConfig> {
       return;
     }
     if (image && image['addEventListener']) {
-      image['addEventListener']('load', () => {
-        this._requestDraw();
-      });
+      image['addEventListener']('load', this._loadListener);
     }
   }
+  _removeImageLoad(image: any) {
+    if (image && image['removeEventListener']) {
+      image['removeEventListener']('load', this._loadListener);
+    }
+  }
+  destroy() {
+    this._removeImageLoad(this.image());
+    super.destroy();
+    return this;
+  }
   _useBufferCanvas() {
+    const hasCornerRadius = !!this.cornerRadius();
+    const hasShadow = this.hasShadow();
+    if (hasCornerRadius && hasShadow) {
+      return true;
+    }
     return super._useBufferCanvas(true);
   }
   _sceneFunc(context: Context) {
@@ -112,7 +133,7 @@ export class Image extends Shape<ImageConfig> {
     // If you need to draw later, you need to execute save/restore
   }
   _hitFunc(context: Context) {
-    var width = this.width(),
+    const width = this.width(),
       height = this.height(),
       cornerRadius = this.cornerRadius();
 
@@ -126,10 +147,10 @@ export class Image extends Shape<ImageConfig> {
     context.fillStrokeShape(this);
   }
   getWidth() {
-    return this.attrs.width ?? (this.image() as any)?.width;
+    return this.attrs.width ?? (this.image() as any)?.width ?? 0;
   }
   getHeight() {
-    return this.attrs.height ?? (this.image() as any)?.height;
+    return this.attrs.height ?? (this.image() as any)?.height ?? 0;
   }
 
   /**
@@ -143,7 +164,6 @@ export class Image extends Shape<ImageConfig> {
    *  Konva.Image.fromURL(imageURL, function(image){
    *    // image is Konva.Image instance
    *    layer.add(image);
-   *    layer.draw();
    *  });
    */
   static fromURL(
@@ -151,9 +171,9 @@ export class Image extends Shape<ImageConfig> {
     callback: (img: Image) => void,
     onError: OnErrorEventHandler = null
   ) {
-    var img = Util.createImageElement();
+    const img = Util.createImageElement();
     img.onload = function () {
-      var image = new Image({
+      const image = new Image({
         image: img,
       });
       callback(image);
@@ -173,6 +193,7 @@ export class Image extends Shape<ImageConfig> {
 }
 
 Image.prototype.className = 'Image';
+Image.prototype._attrsAffectingSize = ['image'];
 _registerNode(Image);
 
 /**

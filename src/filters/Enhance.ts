@@ -1,12 +1,18 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { getNumberValidator } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { getNumberValidator } from '../Validators.ts';
 
-function remap(fromValue, fromMin, fromMax, toMin, toMax) {
+function remap(
+  fromValue: number,
+  fromMin: number,
+  fromMax: number,
+  toMin: number,
+  toMax: number
+) {
   // Compute the range of the data
-  var fromRange = fromMax - fromMin,
-    toRange = toMax - toMin,
-    toValue;
+  const fromRange = fromMax - fromMin,
+    toRange = toMax - toMin;
 
   // If either range is 0, then the value can only be mapped to 1 value
   if (fromRange === 0) {
@@ -17,7 +23,7 @@ function remap(fromValue, fromMin, fromMax, toMin, toMax) {
   }
 
   // (1) untranslate, (2) unscale, (3) rescale, (4) retranslate
-  toValue = (fromValue - fromMin) / fromRange;
+  let toValue = (fromValue - fromMin) / fromRange;
   toValue = toRange * toValue + toMin;
 
   return toValue;
@@ -38,9 +44,9 @@ function remap(fromValue, fromMin, fromMax, toMin, toMax) {
  * node.enhance(0.4);
  */
 export const Enhance: Filter = function (imageData) {
-  var data = imageData.data,
-    nSubPixels = data.length,
-    rMin = data[0],
+  const data = imageData.data,
+    nSubPixels = data.length;
+  let rMin = data[0],
     rMax = rMin,
     r,
     gMin = data[1],
@@ -48,17 +54,16 @@ export const Enhance: Filter = function (imageData) {
     g,
     bMin = data[2],
     bMax = bMin,
-    b,
-    i;
+    b;
 
   // If we are not enhancing anything - don't do any computation
-  var enhanceAmount = this.enhance();
+  const enhanceAmount = this.enhance();
   if (enhanceAmount === 0) {
     return;
   }
 
   // 1st Pass - find the min and max for each channel:
-  for (i = 0; i < nSubPixels; i += 4) {
+  for (let i = 0; i < nSubPixels; i += 4) {
     r = data[i + 0];
     if (r < rMin) {
       rMin = r;
@@ -96,15 +101,12 @@ export const Enhance: Filter = function (imageData) {
     bMin = 0;
   }
 
-  var rMid,
-    rGoalMax,
-    rGoalMin,
-    gMid,
-    gGoalMax,
-    gGoalMin,
-    bMid,
-    bGoalMax,
-    bGoalMin;
+  let rGoalMax: number,
+    rGoalMin: number,
+    gGoalMax: number,
+    gGoalMin: number,
+    bGoalMax: number,
+    bGoalMin: number;
 
   // If the enhancement is positive - stretch the histogram
   if (enhanceAmount > 0) {
@@ -116,19 +118,19 @@ export const Enhance: Filter = function (imageData) {
     bGoalMin = bMin - enhanceAmount * (bMin - 0);
     // If the enhancement is negative -   compress the histogram
   } else {
-    rMid = (rMax + rMin) * 0.5;
+    const rMid = (rMax + rMin) * 0.5;
     rGoalMax = rMax + enhanceAmount * (rMax - rMid);
     rGoalMin = rMin + enhanceAmount * (rMin - rMid);
-    gMid = (gMax + gMin) * 0.5;
+    const gMid = (gMax + gMin) * 0.5;
     gGoalMax = gMax + enhanceAmount * (gMax - gMid);
     gGoalMin = gMin + enhanceAmount * (gMin - gMid);
-    bMid = (bMax + bMin) * 0.5;
+    const bMid = (bMax + bMin) * 0.5;
     bGoalMax = bMax + enhanceAmount * (bMax - bMid);
     bGoalMin = bMin + enhanceAmount * (bMin - bMid);
   }
 
   // Pass 2 - remap everything, except the alpha
-  for (i = 0; i < nSubPixels; i += 4) {
+  for (let i = 0; i < nSubPixels; i += 4) {
     data[i + 0] = remap(data[i + 0], rMin, rMax, rGoalMin, rGoalMax);
     data[i + 1] = remap(data[i + 1], gMin, gMax, gGoalMin, gGoalMax);
     data[i + 2] = remap(data[i + 2], bMin, bMax, bGoalMin, bGoalMax);

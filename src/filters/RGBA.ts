@@ -1,6 +1,7 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { RGBComponent } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { RGBComponent } from '../Validators.ts';
 
 /**
  * RGBA Filter
@@ -18,17 +19,15 @@ import { RGBComponent } from '../Validators';
  */
 
 export const RGBA: Filter = function (imageData) {
-  var data = imageData.data,
+  const data = imageData.data,
     nPixels = data.length,
     red = this.red(),
     green = this.green(),
     blue = this.blue(),
-    alpha = this.alpha(),
-    i,
-    ia;
+    alpha = this.alpha();
 
-  for (i = 0; i < nPixels; i += 4) {
-    ia = 1 - alpha;
+  for (let i = 0; i < nPixels; i += 4) {
+    const ia = 1 - alpha;
 
     data[i] = red * alpha + data[i] * ia; // r
     data[i + 1] = green * alpha + data[i + 1] * ia; // g

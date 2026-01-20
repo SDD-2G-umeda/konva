@@ -1,11 +1,12 @@
-import { Factory } from '../Factory';
-import { Context } from '../Context';
-import { Shape, ShapeConfig } from '../Shape';
-import { Animation } from '../Animation';
-import { getNumberValidator } from '../Validators';
-import { _registerNode } from '../Global';
+import { Factory } from '../Factory.ts';
+import type { Context } from '../Context.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { Animation } from '../Animation.ts';
+import { getNumberValidator } from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
 
-import { GetSet } from '../types';
+import type { GetSet } from '../types.ts';
 
 export interface SpriteConfig extends ShapeConfig {
   animation: string;
@@ -70,7 +71,7 @@ export class Sprite extends Shape<SpriteConfig> {
     super(config);
     this.anim = new Animation(() => {
       // if we don't need to redraw layer we should return false
-      var updated = this._updated;
+      const updated = this._updated;
       this._updated = false;
       return updated;
     });
@@ -92,7 +93,7 @@ export class Sprite extends Shape<SpriteConfig> {
   }
 
   _sceneFunc(context: Context) {
-    var anim = this.animation(),
+    const anim = this.animation(),
       index = this.frameIndex(),
       ix4 = index * 4,
       set = this.animations()[anim],
@@ -112,7 +113,7 @@ export class Sprite extends Shape<SpriteConfig> {
 
     if (image) {
       if (offsets) {
-        var offset = offsets[anim],
+        const offset = offsets[anim],
           ix2 = index * 2;
         context.drawImage(
           image,
@@ -131,7 +132,7 @@ export class Sprite extends Shape<SpriteConfig> {
     }
   }
   _hitFunc(context: Context) {
-    var anim = this.animation(),
+    const anim = this.animation(),
       index = this.frameIndex(),
       ix4 = index * 4,
       set = this.animations()[anim],
@@ -141,8 +142,8 @@ export class Sprite extends Shape<SpriteConfig> {
 
     context.beginPath();
     if (offsets) {
-      var offset = offsets[anim];
-      var ix2 = index * 2;
+      const offset = offsets[anim];
+      const ix2 = index * 2;
       context.rect(offset[ix2 + 0], offset[ix2 + 1], width, height);
     } else {
       context.rect(0, 0, width, height);
@@ -156,7 +157,7 @@ export class Sprite extends Shape<SpriteConfig> {
   }
 
   _setInterval() {
-    var that = this;
+    const that = this;
     this.interval = setInterval(function () {
       that._updateIndex();
     }, 1000 / this.frameRate());
@@ -170,7 +171,7 @@ export class Sprite extends Shape<SpriteConfig> {
     if (this.isRunning()) {
       return;
     }
-    var layer = this.getLayer();
+    const layer = this.getLayer();
 
     /*
      * animation object has no executable function because
@@ -201,7 +202,7 @@ export class Sprite extends Shape<SpriteConfig> {
     return this.anim.isRunning();
   }
   _updateIndex() {
-    var index = this.frameIndex(),
+    const index = this.frameIndex(),
       animation = this.animation(),
       animations = this.animations(),
       anim = animations[animation],

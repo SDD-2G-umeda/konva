@@ -1,13 +1,14 @@
-import { Util } from '../Util';
-import { Factory } from '../Factory';
-import { Context } from '../Context';
-import { Shape, ShapeConfig } from '../Shape';
-import { Path } from './Path';
-import { Text, stringToArray } from './Text';
-import { getNumberValidator } from '../Validators';
-import { _registerNode } from '../Global';
+import { Util } from '../Util.ts';
+import { Factory } from '../Factory.ts';
+import type { Context } from '../Context.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { Path } from './Path.ts';
+import { Text, stringToArray } from './Text.ts';
+import { getNumberValidator } from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
 
-import { GetSet, PathSegment, Vector2d } from '../types';
+import type { GetSet, PathSegment, Vector2d } from '../types.ts';
 
 export interface TextPathConfig extends ShapeConfig {
   text?: string;
@@ -15,10 +16,16 @@ export interface TextPathConfig extends ShapeConfig {
   fontFamily?: string;
   fontSize?: number;
   fontStyle?: string;
+  fontVariant?: string;
+  align?: string;
   letterSpacing?: number;
+  textBaseline?: string;
+  textDecoration?: string;
+  kerningFunc?: (leftChar: string, rightChar: string) => number;
+  lineHeight?: number;
 }
 
-var EMPTY_STRING = '',
+const EMPTY_STRING = '',
   NORMAL = 'normal';
 
 function _fillFunc(this: TextPath, context) {
@@ -82,6 +89,7 @@ export class TextPath extends Shape<TextPathConfig> {
     rotation: number;
     p0: Vector2d;
     p1: Vector2d;
+    width: number;
   }>;
   partialText: string;
   pathLength: number;
@@ -118,8 +126,8 @@ export class TextPath extends Shape<TextPathConfig> {
     }
 
     const totalLength = this.pathLength;
-    // -1px for rounding of the last symbol
-    if (length - 1 > totalLength) {
+
+    if (length > totalLength) {
       return null;
     }
 
@@ -137,30 +145,32 @@ export class TextPath extends Shape<TextPathConfig> {
     context.setAttr('textAlign', 'left');
     context.save();
 
-    var textDecoration = this.textDecoration();
-    var fill = this.fill();
-    var fontSize = this.fontSize();
+    const textDecoration = this.textDecoration();
+    const fill = this.fill();
+    const fontSize = this.fontSize();
 
-    var glyphInfo = this.glyphInfo;
-    if (textDecoration === 'underline') {
+    const glyphInfo = this.glyphInfo;
+    const hasUnderline = textDecoration.indexOf('underline') !== -1;
+    const hasLineThrough = textDecoration.indexOf('line-through') !== -1;
+
+    if (hasUnderline) {
       context.beginPath();
     }
-    for (var i = 0; i < glyphInfo.length; i++) {
+    for (let i = 0; i < glyphInfo.length; i++) {
       context.save();
 
-      var p0 = glyphInfo[i].p0;
+      const p0 = glyphInfo[i].p0;
 
       context.translate(p0.x, p0.y);
       context.rotate(glyphInfo[i].rotation);
       this.partialText = glyphInfo[i].text;
 
       context.fillStrokeShape(this);
-      if (textDecoration === 'underline') {
+      if (hasUnderline) {
         if (i === 0) {
           context.moveTo(0, fontSize / 2 + 1);
         }
-
-        context.lineTo(fontSize, fontSize / 2 + 1);
+        context.lineTo(glyphInfo[i].width, fontSize / 2 + 1);
       }
       context.restore();
 
@@ -173,7 +183,29 @@ export class TextPath extends Shape<TextPathConfig> {
       // context.lineTo(p1.x, p1.y);
       // context.stroke();
     }
-    if (textDecoration === 'underline') {
+    if (hasUnderline) {
+      context.strokeStyle = fill;
+      context.lineWidth = fontSize / 20;
+      context.stroke();
+    }
+
+    if (hasLineThrough) {
+      context.beginPath();
+      for (let i = 0; i < glyphInfo.length; i++) {
+        context.save();
+
+        const p0 = glyphInfo[i].p0;
+
+        context.translate(p0.x, p0.y);
+        context.rotate(glyphInfo[i].rotation);
+
+        if (i === 0) {
+          context.moveTo(0, 0);
+        }
+
+        context.lineTo(glyphInfo[i].width, 0);
+        context.restore();
+      }
       context.strokeStyle = fill;
       context.lineWidth = fontSize / 20;
       context.stroke();
@@ -184,13 +216,13 @@ export class TextPath extends Shape<TextPathConfig> {
   _hitFunc(context: Context) {
     context.beginPath();
 
-    var glyphInfo = this.glyphInfo;
+    const glyphInfo = this.glyphInfo;
     if (glyphInfo.length >= 1) {
-      var p0 = glyphInfo[0].p0;
+      const p0 = glyphInfo[0].p0;
       context.moveTo(p0.x, p0.y);
     }
-    for (var i = 0; i < glyphInfo.length; i++) {
-      var p1 = glyphInfo[i].p1;
+    for (let i = 0; i < glyphInfo.length; i++) {
+      const p1 = glyphInfo[i].p1;
       context.lineTo(p1.x, p1.y);
     }
     context.setAttr('lineWidth', this.fontSize());
@@ -220,13 +252,13 @@ export class TextPath extends Shape<TextPathConfig> {
   }
 
   _getTextSize(text: string) {
-    var dummyCanvas = this.dummyCanvas;
-    var _context = dummyCanvas.getContext('2d')!;
+    const dummyCanvas = this.dummyCanvas;
+    const _context = dummyCanvas.getContext('2d')!;
 
     _context.save();
 
     _context.font = this._getContextFont();
-    var metrics = _context.measureText(text);
+    const metrics = _context.measureText(text);
 
     _context.restore();
 
@@ -236,7 +268,17 @@ export class TextPath extends Shape<TextPathConfig> {
     };
   }
   _setTextData() {
-    const { width, height } = this._getTextSize(this.attrs.text);
+    const charArr = stringToArray(this.text());
+    const chars: { char: string; width: number }[] = [];
+    let width = 0;
+    for (let i = 0; i < charArr.length; i++) {
+      chars.push({
+        char: charArr[i],
+        width: this._getTextSize(charArr[i]).width,
+      });
+      width += chars[i].width;
+    }
+    const { height } = this._getTextSize(this.attrs.text);
     this.textWidth = width;
     this.textHeight = height;
     this.glyphInfo = [];
@@ -263,26 +305,27 @@ export class TextPath extends Shape<TextPathConfig> {
       offset = Math.max(0, this.pathLength - textWidth);
     }
 
-    const charArr = stringToArray(this.text());
-
     // Algorithm for calculating glyph positions:
     // 1. Get the begging point of the glyph on the path using the offsetToGlyph,
     // 2. Get the ending point of the glyph on the path using the offsetToGlyph plus glyph width,
     // 3. Calculate the rotation, width, and midpoint of the glyph using the start and end points,
     // 4. Add glyph width to the offsetToGlyph and repeat
     let offsetToGlyph = offset;
-    for (var i = 0; i < charArr.length; i++) {
+    for (let i = 0; i < chars.length; i++) {
       const charStartPoint = this._getPointAtLength(offsetToGlyph);
       if (!charStartPoint) return;
 
-      let glyphWidth = this._getTextSize(charArr[i]).width + letterSpacing;
-      if (charArr[i] === ' ' && align === 'justify') {
+      const char = chars[i].char;
+      let glyphWidth = chars[i].width + letterSpacing;
+      if (char === ' ' && align === 'justify') {
         const numberOfSpaces = this.text().split(' ').length - 1;
         glyphWidth += (this.pathLength - textWidth) / numberOfSpaces;
       }
 
       const charEndPoint = this._getPointAtLength(offsetToGlyph + glyphWidth);
-      if (!charEndPoint) return;
+      if (!charEndPoint) {
+        return;
+      }
 
       const width = Path.getLineLength(
         charStartPoint.x,
@@ -295,7 +338,7 @@ export class TextPath extends Shape<TextPathConfig> {
       if (kerningFunc) {
         try {
           // getKerning is a user provided getter. Make sure it never breaks our logic
-          kern = kerningFunc(charArr[i - 1], charArr[i]) * this.fontSize();
+          kern = kerningFunc(chars[i - 1].char, char) * this.fontSize();
         } catch (e) {
           kern = 0;
         }
@@ -324,6 +367,7 @@ export class TextPath extends Shape<TextPathConfig> {
         rotation: rotation,
         p0: charStartPoint,
         p1: charEndPoint,
+        width: width,
       });
 
       offsetToGlyph += glyphWidth;
@@ -338,7 +382,7 @@ export class TextPath extends Shape<TextPathConfig> {
         height: 0,
       };
     }
-    var points: number[] = [];
+    const points: number[] = [];
 
     this.glyphInfo.forEach(function (info) {
       points.push(info.p0.x);
@@ -346,12 +390,12 @@ export class TextPath extends Shape<TextPathConfig> {
       points.push(info.p1.x);
       points.push(info.p1.y);
     });
-    var minX = points[0] || 0;
-    var maxX = points[0] || 0;
-    var minY = points[1] || 0;
-    var maxY = points[1] || 0;
-    var x, y;
-    for (var i = 0; i < points.length / 2; i++) {
+    let minX = points[0] || 0;
+    let maxX = points[0] || 0;
+    let minY = points[1] || 0;
+    let maxY = points[1] || 0;
+    let x, y;
+    for (let i = 0; i < points.length / 2; i++) {
       x = points[i * 2];
       y = points[i * 2 + 1];
       minX = Math.min(minX, x);
@@ -359,7 +403,7 @@ export class TextPath extends Shape<TextPathConfig> {
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
-    var fontSize = this.fontSize();
+    const fontSize = this.fontSize();
     return {
       x: minX - fontSize / 2,
       y: minY - fontSize / 2,
@@ -539,7 +583,7 @@ Factory.addGetterSetter(TextPath, 'fontVariant', NORMAL);
 Factory.addGetterSetter(TextPath, 'text', EMPTY_STRING);
 
 /**
- * get/set text decoration of a text.  Can be '' or 'underline'.
+ * get/set text decoration of a text.  Can be '', 'underline', 'line-through', or a combination like 'underline line-through'.
  * @name Konva.TextPath#textDecoration
  * @method
  * @param {String} textDecoration
@@ -550,8 +594,14 @@ Factory.addGetterSetter(TextPath, 'text', EMPTY_STRING);
  *
  * // underline text
  * shape.textDecoration('underline');
+ *
+ * // line-through text
+ * shape.textDecoration('line-through');
+ *
+ * // combine both
+ * shape.textDecoration('underline line-through');
  */
-Factory.addGetterSetter(TextPath, 'textDecoration', null);
+Factory.addGetterSetter(TextPath, 'textDecoration', '');
 
 /**
  * get/set kerning function.
@@ -568,4 +618,4 @@ Factory.addGetterSetter(TextPath, 'textDecoration', null);
  *   return 1;
  * });
  */
-Factory.addGetterSetter(TextPath, 'kerningFunc', null);
+Factory.addGetterSetter(TextPath, 'kerningFunc', undefined);
