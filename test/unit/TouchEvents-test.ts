@@ -6,7 +6,7 @@ import {
   simulateTouchStart,
   simulateTouchEnd,
   simulateTouchMove,
-} from './test-utils';
+} from './test-utils.ts';
 
 describe('TouchEvents', function () {
   // ======================================================
@@ -460,11 +460,11 @@ describe('TouchEvents', function () {
     );
     assert.equal(touchEnd, 1);
     assert.equal(stageTouchEnd, 1);
-    assert.equal(stageTap, 2, 'one tap should be fired');
+    assert.equal(stageTap, 1, 'one tap should be fired');
 
     assert.equal(
       stageEventStack.join(' '),
-      'touchstart touchstart touchstart touchend tap tap',
+      'touchstart touchstart touchstart touchend tap',
       'should fire tap after touchend'
     );
 
@@ -481,7 +481,7 @@ describe('TouchEvents', function () {
     assert.equal(touchEnd, 2);
     assert.equal(touchEnd2, 1);
     assert.equal(stageTouchEnd, 3);
-    assert.equal(stageTap, 2, 'still one tap should be fired');
+    assert.equal(stageTap, 1, 'still one tap should be fired');
     // Don't need to check event stack here, the pointers moved so no tap is fired
   });
 
@@ -826,8 +826,8 @@ describe('TouchEvents', function () {
 
     stage.on('tap', function (e) {
       assert.equal(e.target, circle1);
-      assert.equal(stage.getPointerPosition().x, 100);
-      assert.equal(stage.getPointerPosition().y, 100);
+      assert.equal(stage.getPointerPosition()?.x, 100);
+      assert.equal(stage.getPointerPosition()?.y, 100);
       tap += 1;
     });
 

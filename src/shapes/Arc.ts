@@ -1,10 +1,11 @@
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { Konva } from '../Global';
-import { GetSet } from '../types';
-import { getNumberValidator, getBooleanValidator } from '../Validators';
-import { _registerNode } from '../Global';
-import { Context } from '../Context';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { Konva } from '../Global.ts';
+import type { GetSet } from '../types.ts';
+import { getNumberValidator, getBooleanValidator } from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
+import type { Context } from '../Context.ts';
 
 export interface ArcConfig extends ShapeConfig {
   angle: number;
@@ -39,7 +40,7 @@ export interface ArcConfig extends ShapeConfig {
  */
 export class Arc extends Shape<ArcConfig> {
   _sceneFunc(context: Context) {
-    var angle = Konva.getAngle(this.angle()),
+    const angle = Konva.getAngle(this.angle()),
       clockwise = this.clockwise();
 
     context.beginPath();
@@ -98,7 +99,12 @@ export class Arc extends Shape<ArcConfig> {
 
 Arc.prototype._centroid = true;
 Arc.prototype.className = 'Arc';
-Arc.prototype._attrsAffectingSize = ['innerRadius', 'outerRadius'];
+Arc.prototype._attrsAffectingSize = [
+  'innerRadius',
+  'outerRadius',
+  'angle',
+  'clockwise',
+];
 _registerNode(Arc);
 
 // add getters setters

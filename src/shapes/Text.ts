@@ -1,24 +1,65 @@
-import { Util } from '../Util';
-import { Context } from '../Context';
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { Konva } from '../Global';
+import { Util } from '../Util.ts';
+import type { Context } from '../Context.ts';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { Konva } from '../Global.ts';
 import {
   getNumberValidator,
   getStringValidator,
   getNumberOrAutoValidator,
   getBooleanValidator,
-} from '../Validators';
-import { _registerNode } from '../Global';
+} from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
 
-import { GetSet } from '../types';
+import type { GetSet } from '../types.ts';
 
-export function stringToArray(string: string) {
-  // we need to use `Array.from` because it can split unicode string correctly
-  // we also can use some regexp magic from lodash:
-  // https://github.com/lodash/lodash/blob/fb1f99d9d90ad177560d771bc5953a435b2dc119/lodash.toarray/index.js#L256
-  // but I decided it is too much code for that small fix
-  return Array.from(string);
+export interface CharRenderProps {
+  char: string;
+  index: number;
+  x: number;
+  y: number;
+  lineIndex: number;
+  column: number;
+  isLastInLine: boolean;
+  width: number;
+  context: Context;
+}
+
+export function stringToArray(string: string): string[] {
+  // Use Unicode-aware splitting
+  return [...string].reduce((acc, char, index, array) => {
+    // Handle emoji with skin tone modifiers and ZWJ sequences
+    if (/\p{Emoji}/u.test(char)) {
+      // Check if next character is a modifier or ZWJ sequence
+      const nextChar = array[index + 1];
+      if (nextChar && /\p{Emoji_Modifier}|\u200D/u.test(nextChar)) {
+        // If we have a modifier, combine with current emoji
+        acc.push(char + nextChar);
+        // Skip the next character since we've used it
+        array[index + 1] = '';
+      } else {
+        // No modifier - treat as separate emoji
+        acc.push(char);
+      }
+    }
+    // Handle regional indicator symbols (flags)
+    else if (
+      /\p{Regional_Indicator}{2}/u.test(char + (array[index + 1] || ''))
+    ) {
+      acc.push(char + array[index + 1]);
+    }
+    // Handle Indic scripts and other combining characters
+    else if (index > 0 && /\p{Mn}|\p{Me}|\p{Mc}/u.test(char)) {
+      acc[acc.length - 1] += char;
+    }
+    // Handle other characters
+    else if (char) {
+      // Only push if not an empty string (skipped modifier)
+      acc.push(char);
+    }
+    return acc;
+  }, [] as string[]);
 }
 
 export interface TextConfig extends ShapeConfig {
@@ -29,6 +70,7 @@ export interface TextConfig extends ShapeConfig {
   fontStyle?: string;
   fontVariant?: string;
   textDecoration?: string;
+  underlineOffset?: number;
   align?: string;
   verticalAlign?: string;
   padding?: number;
@@ -40,7 +82,7 @@ export interface TextConfig extends ShapeConfig {
 }
 
 // constants
-var AUTO = 'auto',
+const AUTO = 'auto',
   //CANVAS = 'canvas',
   CENTER = 'center',
   INHERIT = 'inherit',
@@ -49,7 +91,6 @@ var AUTO = 'auto',
   CONTEXT_2D = '2d',
   DASH = '-',
   LEFT = 'left',
-  LTR = 'ltr',
   TEXT = 'text',
   TEXT_UPPER = 'Text',
   TOP = 'top',
@@ -106,6 +147,17 @@ function normalizeFontFamily(fontFamily: string) {
     .join(', ');
 }
 
+let dummyContext: CanvasRenderingContext2D;
+function getDummyContext() {
+  if (dummyContext) {
+    return dummyContext;
+  }
+  dummyContext = Util.createCanvasElement().getContext(
+    CONTEXT_2D
+  ) as CanvasRenderingContext2D;
+  return dummyContext;
+}
+
 function _fillFunc(this: Text, context: Context) {
   context.fillText(this._partialText, this._partialTextX, this._partialTextY);
 }
@@ -140,8 +192,9 @@ function checkDefaultFill(config?: TextConfig) {
  * @param {String} [config.fontStyle] can be 'normal', 'italic', or 'bold', '500' or even 'italic bold'.  'normal' is the default.
  * @param {String} [config.fontVariant] can be normal or small-caps.  Default is normal
  * @param {String} [config.textDecoration] can be line-through, underline or empty string. Default is empty string.
+ * @param {String} [config.underlineOffset] offset for underline line. Default is calculated based on font size.
  * @param {String} config.text
- * @param {String} [config.align] can be left, center, or right
+ * @param {String} [config.align] can be left, center, right or justify
  * @param {String} [config.verticalAlign] can be top, middle or bottom
  * @param {Number} [config.padding]
  * @param {Number} [config.lineHeight] default is 1
@@ -170,21 +223,21 @@ export class Text extends Shape<TextConfig> {
   constructor(config?: TextConfig) {
     super(checkDefaultFill(config));
     // update text data for certain attr changes
-    for (var n = 0; n < attrChangeListLen; n++) {
+    for (let n = 0; n < attrChangeListLen; n++) {
       this.on(ATTR_CHANGE_LIST[n] + CHANGE_KONVA, this._setTextData);
     }
     this._setTextData();
   }
 
   _sceneFunc(context: Context) {
-    var textArr = this.textArr,
+    const textArr = this.textArr,
       textArrLen = textArr.length;
 
     if (!this.text()) {
       return;
     }
 
-    var padding = this.padding(),
+    let padding = this.padding(),
       fontSize = this.fontSize(),
       fontFamily = this._getContextFont(),
       lineHeightPx = this.lineHeight() * fontSize,
@@ -194,18 +247,30 @@ export class Text extends Shape<TextConfig> {
       align = this.align(),
       totalWidth = this.getWidth(),
       letterSpacing = this.letterSpacing(),
+      charRenderFunc = this.charRenderFunc(),
       fill = this.fill(),
       textDecoration = this.textDecoration(),
       vertical = this.vertical(),
+      underlineOffset = this.underlineOffset(),
       shouldUnderline = textDecoration.indexOf('underline') !== -1,
       shouldLineThrough = textDecoration.indexOf('line-through') !== -1,
       n;
-    
+
     direction = direction === INHERIT ? context.direction : direction;
 
-    var translateY = lineHeightPx / 2;
+    let translateY = lineHeightPx / 2;
+    let baseline = MIDDLE;
+    if (!Konva.legacyTextRendering) {
+      const metrics = this.measureSize('M'); // Use a sample character to get the ascent
 
-    var lineTranslateX = 0;
+      baseline = 'alphabetic';
+      const ascent =
+        metrics.fontBoundingBoxAscent ?? metrics.actualBoundingBoxAscent;
+      const descent =
+        metrics.fontBoundingBoxDescent ?? metrics.actualBoundingBoxDescent;
+
+      translateY = (ascent - descent) / 2 + lineHeightPx / 2;
+    }
 
     if (direction === RTL) {
       context.setAttr('direction', direction);
@@ -213,7 +278,7 @@ export class Text extends Shape<TextConfig> {
 
     context.setAttr('font', this._getContextFont());
 
-    context.setAttr('textBaseline', MIDDLE);
+    context.setAttr('textBaseline', baseline);
 
     context.setAttr('textAlign', LEFT);
 
@@ -229,16 +294,15 @@ export class Text extends Shape<TextConfig> {
 
     // draw text lines
     var lineTranslateX = this.getWidth() - padding * 2
-    
+
     for (n = 0; n < textArrLen; n++) {
-      var obj = textArr[n],
+      let lineTranslateX = 0;
+      let lineTranslateY = 0;
+      const obj = textArr[n],
         text = obj.text,
         width = Math.max(obj.width, fontSize),
         height = obj.height,
-        lastLine = obj.lastInParagraph,
-        spacesNumber,
-        oneWord,
-        lineWidth;
+        lastLine = obj.lastInParagraph;
 
       // horizontal alignment
       context.save();
@@ -255,8 +319,8 @@ export class Text extends Shape<TextConfig> {
 
           this._partialText = char;
           const isRotate = Konva.VERTICAL_ROTATE_90.includes(char);
-          const isRotateUp =  Konva.VERTICAL_ROTATE_90_UP.includes(char);
-          const isRotateDown =  Konva.VERTICAL_ROTATE_90_DOWN.includes(char);
+          const isRotateUp = Konva.VERTICAL_ROTATE_90_UP.includes(char);
+          const isRotateDown = Konva.VERTICAL_ROTATE_90_DOWN.includes(char);
           if (isRotate || isRotateUp || isRotateDown) {
             this._partialTextX = 0;
             this._partialTextY = 0;
@@ -282,13 +346,13 @@ export class Text extends Shape<TextConfig> {
             // 回転した分戻す
             context.restore();
           } else {
-            if ( Konva.VERTICAL_TOP_RIGHT.includes(char)) {
+            if (Konva.VERTICAL_TOP_RIGHT.includes(char)) {
               this._partialTextX = lineTranslateX + diffX + size.width / 8;
               this._partialTextY = translateY - size.height / 8;
-            } else if ( Konva.VERTICAL_TOP_RIGHT_OVER.includes(char)) {
+            } else if (Konva.VERTICAL_TOP_RIGHT_OVER.includes(char)) {
               this._partialTextX = lineTranslateX + diffX + size.width * 0.65;
               this._partialTextY = translateY - size.height / 2;
-            }  else {
+            } else {
               this._partialTextX = lineTranslateX + diffX;
               this._partialTextY = translateY;
             }
@@ -324,18 +388,17 @@ export class Text extends Shape<TextConfig> {
           context.save();
           context.beginPath();
 
-          context.moveTo(
-            lineTranslateX,
-            translateY + Math.round(fontSize / 2)
-          );
-          spacesNumber = text.split(' ').length - 1;
-          oneWord = spacesNumber === 0;
-          lineWidth =
+          const yOffset =
+            underlineOffset ??
+            (!Konva.legacyTextRendering
+              ? Math.round(fontSize / 4)
+              : Math.round(fontSize / 2));
+          const x = lineTranslateX;
+          const y = translateY + lineTranslateY + yOffset;
+          context.moveTo(x, y);
+          const lineWidth =
             align === JUSTIFY && !lastLine ? totalWidth - padding * 2 : width;
-          context.lineTo(
-            lineTranslateX + Math.round(lineWidth),
-            translateY + Math.round(fontSize / 2)
-          );
+          context.lineTo(x + Math.round(lineWidth), y);
 
           // I have no idea what is real ratio
           // just /15 looks good enough
@@ -346,35 +409,22 @@ export class Text extends Shape<TextConfig> {
           context.stroke();
           context.restore();
         }
-        if (shouldLineThrough) {
-          context.save();
-          context.beginPath();
-          context.moveTo(lineTranslateX, translateY);
-          spacesNumber = text.split(' ').length - 1;
-          oneWord = spacesNumber === 0;
-          lineWidth =
-            align === JUSTIFY && lastLine && !oneWord
-              ? totalWidth - padding * 2
-              : width;
-          context.lineTo(
-            lineTranslateX + Math.round(lineWidth),
-            translateY
-          );
-          context.lineWidth = fontSize / 15;
-          const gradient = this._getLinearGradient();
-          context.strokeStyle = gradient || fill;
-          context.stroke();
-          context.restore();
-        }
+
+        // store the starting x position for line-through which is drawn after text
+        const lineThroughStartX = lineTranslateX;
+
         // As `letterSpacing` isn't supported on Safari, we use this polyfill.
         // The exception is for RTL text, which we rely on native as it cannot
         // be supported otherwise.
-        if (direction !== RTL && (letterSpacing !== 0 || align === JUSTIFY)) {
+        if (
+          direction !== RTL &&
+          (letterSpacing !== 0 || align === JUSTIFY || charRenderFunc)
+        ) {
           //   var words = text.split(' ');
-          spacesNumber = text.split(' ').length - 1;
-          var array = stringToArray(text);
-          for (var li = 0; li < array.length; li++) {
-            var letter = array[li];
+          const spacesNumber = text.split(' ').length - 1;
+          const array = stringToArray(text);
+          for (let li = 0; li < array.length; li++) {
+            const letter = array[li];
             // skip justify for the last line
             if (letter === ' ' && !lastLine && align === JUSTIFY) {
               lineTranslateX += (totalWidth - padding * 2 - width) / spacesNumber;
@@ -384,21 +434,69 @@ export class Text extends Shape<TextConfig> {
               // );
             }
             this._partialTextX = lineTranslateX;
-            this._partialTextY = translateY;
+            this._partialTextY = translateY + lineTranslateY;
             this._partialText = letter;
+
+            if (charRenderFunc) {
+              context.save();
+              const previousLines = textArr.slice(0, n);
+              const previousGraphemes = previousLines.reduce(
+                (acc, line) => acc + stringToArray(line.text).length,
+                0
+              );
+              const charIndex = li + previousGraphemes;
+              charRenderFunc({
+                char: letter,
+                index: charIndex,
+                x: lineTranslateX,
+                y: translateY + lineTranslateY,
+                lineIndex: n,
+                column: li,
+                isLastInLine: lastLine,
+                width: this.measureSize(letter).width,
+                context,
+              });
+            }
             context.fillStrokeShape(this);
-            lineTranslateX += Konva.measureText(letter, fontSize, fontFamily, vertical).width + letterSpacing;
+            if (charRenderFunc) {
+              context.restore();
+            }
+            lineTranslateX += this.measureSize(letter).width + letterSpacing;
           }
         } else {
           if (letterSpacing !== 0) {
             context.setAttr('letterSpacing', `${letterSpacing}px`);
           }
           this._partialTextX = lineTranslateX;
-          this._partialTextY = translateY;
+          this._partialTextY = translateY + lineTranslateY;
           this._partialText = text;
 
           context.fillStrokeShape(this);
         }
+
+        // draw line-through above the text content
+        if (shouldLineThrough) {
+          context.save();
+          context.beginPath();
+          const yOffset = !Konva.legacyTextRendering
+            ? -Math.round(fontSize / 4)
+            : 0;
+          const x = lineThroughStartX;
+          context.moveTo(x, translateY + lineTranslateY + yOffset);
+          const lineWidth =
+            align === JUSTIFY && !lastLine ? totalWidth - padding * 2 : width;
+
+          context.lineTo(
+            x + Math.round(lineWidth),
+            translateY + lineTranslateY + yOffset
+          );
+          context.lineWidth = fontSize / 15;
+          const gradient = this._getLinearGradient();
+          context.strokeStyle = gradient || fill;
+          context.stroke();
+          context.restore();
+        }
+
         context.restore();
         if (textArrLen > 1) {
           translateY += lineHeightPx;
@@ -407,7 +505,7 @@ export class Text extends Shape<TextConfig> {
     }
   }
   _hitFunc(context: Context) {
-    var width = this.getWidth(),
+    const width = this.getWidth(),
       height = this.getHeight();
 
     context.beginPath();
@@ -416,23 +514,24 @@ export class Text extends Shape<TextConfig> {
     context.fillStrokeShape(this);
   }
   setText(text: string) {
-    var str = Util._isString(text)
+    const str = Util._isString(text)
       ? text
       : text === null || text === undefined
-      ? ''
-      : text + '';
+        ? ''
+        : text + '';
     this._setAttr(TEXT, str);
     return this;
   }
-  getWidth(): number {
-    var isAuto = this.attrs.width === AUTO || this.attrs.width === undefined;
+  getWidth() {
+    const isAuto = this.attrs.width === AUTO || this.attrs.width === undefined;
     return isAuto ? this.getTextWidth() + this.padding() * 2 : this.attrs.width;
   }
   getHeight() {
-    var isAuto = this.attrs.height === AUTO || this.attrs.height === undefined;
+    const isAuto =
+      this.attrs.height === AUTO || this.attrs.height === undefined;
     return isAuto
       ? this.fontSize() * this.textArr.length * this.lineHeight() +
-          this.padding() * 2
+      this.padding() * 2
       : this.attrs.height;
   }
   /**
@@ -451,6 +550,50 @@ export class Text extends Shape<TextConfig> {
     return this.textHeight;
   }
 
+  /**
+   * measure string with the font of current text shape.
+   * That method can't handle multiline text.
+   * @method
+   * @name Konva.Text#measureSize
+   * @param {String} text text to measure
+   * @returns {Object} { width , height } of measured text
+   */
+  measureSize(text: string) {
+    let _context = getDummyContext(),
+      fontSize = this.fontSize(),
+      metrics: TextMetrics;
+
+    _context.save();
+    _context.font = this._getContextFont();
+
+    metrics = _context.measureText(text);
+    _context.restore();
+
+    // Scale the fallback values based on the provided fontSize compared to the sample size (100 in your new case)
+    const scaleFactor = fontSize / 100;
+
+    // Note, fallback values are from chrome browser with 100px font size and font-family "Arial"
+    return {
+      actualBoundingBoxAscent:
+        metrics.actualBoundingBoxAscent ?? 71.58203125 * scaleFactor,
+      actualBoundingBoxDescent: metrics.actualBoundingBoxDescent ?? 0, // Remains zero as there is no descent in the provided metrics
+      actualBoundingBoxLeft:
+        metrics.actualBoundingBoxLeft ?? -7.421875 * scaleFactor,
+      actualBoundingBoxRight:
+        metrics.actualBoundingBoxRight ?? 75.732421875 * scaleFactor,
+      alphabeticBaseline: metrics.alphabeticBaseline ?? 0, // Remains zero as it's typically relative to the baseline itself
+      emHeightAscent: metrics.emHeightAscent ?? 100 * scaleFactor,
+      emHeightDescent: metrics.emHeightDescent ?? -20 * scaleFactor,
+      fontBoundingBoxAscent: metrics.fontBoundingBoxAscent ?? 91 * scaleFactor,
+      fontBoundingBoxDescent:
+        metrics.fontBoundingBoxDescent ?? 21 * scaleFactor,
+      hangingBaseline:
+        metrics.hangingBaseline ?? 72.80000305175781 * scaleFactor,
+      ideographicBaseline: metrics.ideographicBaseline ?? -21 * scaleFactor,
+      width: metrics.width,
+      height: fontSize, // Typically set to the font size
+    };
+  }
   _getContextFont() {
     return (
       this.fontStyle() +
@@ -475,21 +618,27 @@ export class Text extends Shape<TextConfig> {
       lastInParagraph: false,
     });
   }
-
+  _getTextWidth(text: string) {
+    const letterSpacing = this.letterSpacing();
+    const length = text.length;
+    // letterSpacing * length is the total letter spacing for the text
+    // previously we used letterSpacing * (length - 1) but it doesn't match DOM behavior
+    return getDummyContext().measureText(text).width + letterSpacing * length;
+  }
   _setTextData() {
-    var lines = this.text().split('\n'),
+    let lines = this.text().split('\n'),
       fontSize = +this.fontSize(),
       fontFamily = this._getContextFont(),
       textWidth = 0,
       lineHeightPx = this.lineHeight() * fontSize,
-      width = this.attrs.width as number | 'auto' | undefined,
-      height = this.attrs.height as number | 'auto' | undefined,
+      width = this.attrs.width,
+      height = this.attrs.height,
       vertical = this.vertical(),
       fixedWidth = width !== AUTO && width !== undefined,
       fixedHeight = height !== AUTO && height !== undefined,
       padding = this.padding(),
-      maxWidth = typeof width === 'number' ? width - padding * 2 : undefined,
-      maxHeightPx = typeof height === 'number' ?  height - padding * 2 : undefined,
+      maxWidth = width - padding * 2,
+      maxHeightPx = height - padding * 2,
       currentHeightPx = 0,
       wrap = this.wrap(),
       // align = this.align(),
@@ -498,9 +647,6 @@ export class Text extends Shape<TextConfig> {
       shouldAddEllipsis = this.ellipsis();
 
     this.textArr = [];
-    var additionalWidth = shouldAddEllipsis 
-      ? Konva.measureText(ELLIPSIS, fontSize, fontFamily, vertical).width 
-      : 0;
 
     if (vertical) {
       // 縦書きで高さが設定されていない場合は文字を表示しない
@@ -518,7 +664,7 @@ export class Text extends Shape<TextConfig> {
           for (const char of textArr) {
             const size = Konva.measureText(char, fontSize, fontFamily, true);
             if (Konva.VERTICAL_ROTATE_90.includes(char)
-              || Konva.VERTICAL_ROTATE_90_DOWN.includes(char) 
+              || Konva.VERTICAL_ROTATE_90_DOWN.includes(char)
               || Konva.VERTICAL_ROTATE_90_UP.includes(char)) {
               w = Math.max(w, size.height);
               h += size.width;
@@ -549,59 +695,82 @@ export class Text extends Shape<TextConfig> {
         this.textWidth = sizes.reduce((prev, curr) => prev + curr.width, 0) + (lines.length - 1) * VERTICAL_SPACING;
       }
     } else {
-      for (var i = 0, max = lines.length; i < max; ++i) {
-        var line = lines[i];
-        var lineWidth = Konva.measureText(line, fontSize, fontFamily, false).width;
-        if (fixedWidth && maxWidth && lineWidth > maxWidth) {
+      getDummyContext().font = this._getContextFont();
+      const additionalWidth = shouldAddEllipsis
+        ? this._getTextWidth(ELLIPSIS)
+        : 0;
+      for (let i = 0, max = lines.length; i < max; ++i) {
+        let line = lines[i];
+
+        let lineWidth = this._getTextWidth(line);
+        if (fixedWidth && lineWidth > maxWidth) {
           /*
-          * if width is fixed and line does not fit entirely
-          * break the line into multiple fitting lines
-          */
+           * if width is fixed and line does not fit entirely
+           * break the line into multiple fitting lines
+           */
           while (line.length > 0) {
             /*
-            * use binary search to find the longest substring that
-            * that would fit in the specified width
-            */
-            var low = 0,
-              high = line.length,
+             * use binary search to find the longest substring that
+             * that would fit in the specified width
+             */
+            let low = 0,
+              high = stringToArray(line).length, // Convert to array for proper emoji handling
               match = '',
               matchWidth = 0;
             while (low < high) {
-              var mid = (low + high) >>> 1,
-                substr = line.slice(0, mid + 1),
-                substrWidth = Konva.measureText(substr, fontSize, fontFamily, false).width + additionalWidth;
-              if (substrWidth <= maxWidth) {
+              const mid = (low + high) >>> 1,
+                // Convert array indices to string
+                lineArray = stringToArray(line),
+                substr = lineArray.slice(0, mid + 1).join(''),
+                substrWidth = this._getTextWidth(substr);
+
+              // Only add ellipsis width when we need to consider truncation
+              // for the current line (when it might be the last visible line)
+              const shouldConsiderEllipsis =
+                shouldAddEllipsis &&
+                fixedHeight &&
+                currentHeightPx + lineHeightPx > maxHeightPx;
+
+              const effectiveWidth = shouldConsiderEllipsis
+                ? substrWidth + additionalWidth
+                : substrWidth;
+
+              if (effectiveWidth <= maxWidth) {
                 low = mid + 1;
                 match = substr;
-                matchWidth = substrWidth;
+                matchWidth = substrWidth; // Store actual text width without ellipsis
               } else {
                 high = mid;
               }
             }
             /*
-            * 'low' is now the index of the substring end
-            * 'match' is the substring
-            * 'matchWidth' is the substring width in px
-            */
+             * 'low' is now the index of the substring end
+             * 'match' is the substring
+             * 'matchWidth' is the substring width in px
+             */
             if (match) {
               // a fitting substring was found
               if (wrapAtWord) {
                 // try to find a space or dash where wrapping could be done
-                var wrapIndex;
-                var nextChar = line[match.length];
-                var nextIsSpaceOrDash = nextChar === SPACE || nextChar === DASH;
+                const lineArray = stringToArray(line);
+                const matchArray = stringToArray(match);
+                const nextChar = lineArray[matchArray.length];
+                const nextIsSpaceOrDash = nextChar === SPACE || nextChar === DASH;
+
+                let wrapIndex;
                 if (nextIsSpaceOrDash && matchWidth <= maxWidth) {
-                  wrapIndex = match.length;
+                  wrapIndex = matchArray.length;
                 } else {
-                  wrapIndex =
-                    Math.max(match.lastIndexOf(SPACE), match.lastIndexOf(DASH)) +
-                    1;
+                  // Find last space or dash in the array
+                  const lastSpaceIndex = matchArray.lastIndexOf(SPACE);
+                  const lastDashIndex = matchArray.lastIndexOf(DASH);
+                  wrapIndex = Math.max(lastSpaceIndex, lastDashIndex) + 1;
                 }
+
                 if (wrapIndex > 0) {
-                  // re-cut the substring found at the space/dash position
                   low = wrapIndex;
-                  match = match.slice(0, low);
-                  matchWidth = Konva.measureText(match, fontSize, fontFamily, false).width;
+                  match = lineArray.slice(0, low).join('');
+                  matchWidth = this._getTextWidth(match);
                 }
               }
               // if (align === 'right') {
@@ -611,23 +780,24 @@ export class Text extends Shape<TextConfig> {
               textWidth = Math.max(textWidth, matchWidth);
               currentHeightPx += lineHeightPx;
 
-              var shouldHandleEllipsis =
+              const shouldHandleEllipsis =
                 this._shouldHandleEllipsis(currentHeightPx);
               if (shouldHandleEllipsis) {
                 this._tryToAddEllipsisToLastLine();
                 /*
-                * stop wrapping if wrapping is disabled or if adding
-                * one more line would overflow the fixed height
-                */
+                 * stop wrapping if wrapping is disabled or if adding
+                 * one more line would overflow the fixed height
+                 */
                 break;
               }
-              line = line.slice(low);
-              line = line.trimLeft();
+
+              // Convert remaining text using array operations
+              const lineArray = stringToArray(line);
+              line = lineArray.slice(low).join('').trimLeft();
+
               if (line.length > 0) {
-                // Check if the remaining text would fit on one line
-                lineWidth = Konva.measureText(line, fontSize, fontFamily, false).width;
+                lineWidth = this._getTextWidth(line);
                 if (lineWidth <= maxWidth) {
-                  // if it does, add the line and break out of the loop
                   this._addTextLine(line);
                   currentHeightPx += lineHeightPx;
                   textWidth = Math.max(textWidth, lineWidth);
@@ -652,7 +822,7 @@ export class Text extends Shape<TextConfig> {
         if (this.textArr[this.textArr.length - 1]) {
           this.textArr[this.textArr.length - 1].lastInParagraph = true;
         }
-        if (fixedHeight && maxHeightPx && currentHeightPx + lineHeightPx > maxHeightPx) {
+        if (fixedHeight && currentHeightPx + lineHeightPx > maxHeightPx) {
           break;
         }
       }
@@ -670,10 +840,10 @@ export class Text extends Shape<TextConfig> {
    * 1. the current line is the last line
    * 2. wrap is NONE
    * @param {Number} currentHeightPx
-   * @returns
+   * @returns {Boolean}
    */
   _shouldHandleEllipsis(currentHeightPx: number): boolean {
-    var fontSize = +this.fontSize(),
+    const fontSize = +this.fontSize(),
       lineHeightPx = this.lineHeight() * fontSize,
       height = this.attrs.height,
       fixedHeight = height !== AUTO && height !== undefined,
@@ -689,19 +859,19 @@ export class Text extends Shape<TextConfig> {
   }
 
   _tryToAddEllipsisToLastLine(): void {
-    var width = this.attrs.width,
+    const width = this.attrs.width,
       fixedWidth = width !== AUTO && width !== undefined,
       padding = this.padding(),
       maxWidth = width - padding * 2,
       shouldAddEllipsis = this.ellipsis();
 
-    var lastLine = this.textArr[this.textArr.length - 1];
+    const lastLine = this.textArr[this.textArr.length - 1];
     if (!lastLine || !shouldAddEllipsis) {
       return;
     }
 
     if (fixedWidth) {
-      var haveSpace = Konva.measureText(lastLine.text + ELLIPSIS, this.fontSize(), this._getContextFont(), this.vertical()).width < maxWidth;
+      const haveSpace = Konva.measureText(lastLine.text + ELLIPSIS, this.fontSize(), this._getContextFont(), this.vertical()).width < maxWidth;
       if (!haveSpace) {
         lastLine.text = lastLine.text.slice(0, lastLine.text.length - 3);
       }
@@ -739,10 +909,12 @@ export class Text extends Shape<TextConfig> {
   padding: GetSet<number, this>;
   lineHeight: GetSet<number, this>;
   textDecoration: GetSet<string, this>;
+  underlineOffset: GetSet<number, this>;
   text: GetSet<string, this>;
   wrap: GetSet<string, this>;
   ellipsis: GetSet<boolean, this>;
   vertical: GetSet<boolean, this>;
+  charRenderFunc: GetSet<null | ((props: CharRenderProps) => void), this>;
 }
 
 Text.prototype._fillFunc = _fillFunc;
@@ -796,7 +968,6 @@ Factory.overWriteSetter(Text, 'width', getNumberOrAutoValidator());
  */
 
 Factory.overWriteSetter(Text, 'height', getNumberOrAutoValidator());
-
 
 /**
  * get/set direction
@@ -906,6 +1077,8 @@ Factory.addGetterSetter(Text, 'padding', 0, getNumberValidator());
  *
  * // align text to right
  * text.align('right');
+ *
+ * // justify text
  */
 
 Factory.addGetterSetter(Text, 'align', LEFT);
@@ -1027,3 +1200,41 @@ Factory.addGetterSetter(Text, 'textDecoration', '');
 
 
 Factory.addGetterSetter(Text, 'vertical', false, getBooleanValidator());
+
+/**
+ * get/set text underline decoration offset. Offset for underline line. Default is calculated based on font size.
+ * @name Konva.Text#underlineOffset
+ * @method
+ * @param {Number} underlineOffset
+ * @returns {Number}
+ * @example
+ * // get underline offset
+ * var underlineOffset = text.underlineOffset();
+ *
+ * // set underline offset
+ * text.underlineOffset(5);
+ */
+Factory.addGetterSetter(
+  Text,
+  'underlineOffset',
+  undefined,
+  getNumberValidator()
+);
+
+/**
+ * get/set per-character render hook. The callback is invoked for each grapheme before drawing.
+ * It can mutate the provided context (e.g. translate, rotate, change styles) and should return void.
+ * Note: per-character rendering may disable native kerning/ligatures.
+ * @name Konva.Text#charRenderFunc
+ * @method
+ * @param {Function} charRenderFunc
+ * @returns {Function}
+ * @example
+ * // apply small x-translation to every second character
+ * text.charRenderFunc(function(props) {
+ *   if (props.index % 2 === 1) {
+ *     props.context.translate(2, 0);
+ *   }
+ * });
+ */
+Factory.addGetterSetter(Text, 'charRenderFunc', undefined);

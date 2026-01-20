@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 
-import { addStage, Konva } from './test-utils';
+import { addStage, Konva } from './test-utils.ts';
 
 describe('Tween', function () {
   // ======================================================
@@ -98,8 +98,8 @@ describe('Tween', function () {
 
     tween.destroy();
 
-    assert.equal(Konva.Tween.tweens[circle._id].x, undefined);
-    assert.equal(Konva.Tween.attrs[circle._id][tween._id], undefined);
+    assert.equal(Konva.Tween.tweens[circle._id], undefined);
+    assert.equal(Konva.Tween.attrs[circle._id], undefined);
   });
 
   // ======================================================
@@ -153,7 +153,7 @@ describe('Tween', function () {
     stage.add(layer);
 
     var duration = 0.1;
-    var c = Konva.Util.colorToRGBA('rgba(0,255,0,0.5)');
+    var c = Konva.Util.colorToRGBA('rgba(0,255,0,0.5)')!;
     var endFill = 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + c.a + ')';
     var midFill = 'rgba(128,128,0,0.75)';
 
@@ -238,7 +238,7 @@ describe('Tween', function () {
       duration: 0.1,
       onFinish: function () {
         assert.equal(circle.x(), stage.width() / 2);
-        assert.equal(Object.keys(Konva.Tween.attrs[circle._id]).length, 0);
+        assert.equal(Konva.Tween.attrs[circle._id], undefined);
         done();
       },
     });
@@ -253,6 +253,34 @@ describe('Tween', function () {
       onFinish: () => {
         assert(stage.x() === 10);
         done();
+      },
+    });
+  });
+
+  it('to method double simple usage', function (done) {
+    var stage = addStage();
+
+    let finishCount = 0;
+    const onFinish = () => {
+      if (finishCount === 2) {
+        done();
+      }
+    };
+    stage.to({
+      x: 10,
+      duration: 0.001,
+      onFinish: () => {
+        assert(stage.x() === 10);
+        finishCount += 1;
+        onFinish();
+      },
+    });
+    stage.to({
+      y: 10,
+      duration: 0.001,
+      onFinish: () => {
+        finishCount += 1;
+        onFinish();
       },
     });
   });
@@ -303,18 +331,14 @@ describe('Tween', function () {
 
     line.to({
       points: [100, 100, 200, 100, 200, 200, 100, 200],
+      // add another attribute for better test of cleanup
+      x: 10,
       duration: 0.1,
       onFinish: function () {
-        assert.deepEqual(line.points(), [
-          100,
-          100,
-          200,
-          100,
-          200,
-          200,
-          100,
-          200,
-        ]);
+        assert.deepEqual(
+          line.points(),
+          [100, 100, 200, 100, 200, 200, 100, 200]
+        );
         done();
       },
     });
@@ -364,16 +388,10 @@ describe('Tween', function () {
         tween.reverse();
       },
       onReset: function () {
-        assert.deepEqual(line.points(), [
-          100,
-          100,
-          200,
-          100,
-          200,
-          200,
-          100,
-          200,
-        ]);
+        assert.deepEqual(
+          line.points(),
+          [100, 100, 200, 100, 200, 200, 100, 200]
+        );
         done();
       },
     });

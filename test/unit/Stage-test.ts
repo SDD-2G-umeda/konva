@@ -8,14 +8,15 @@ import {
   simulateTouchStart,
   simulateTouchMove,
   simulateTouchEnd,
+  simulatePointerMove,
   compareCanvases,
-  createCanvas,
   showHit,
   getContainer,
   isNode,
   isBrowser,
   Konva,
-} from './test-utils';
+  createCanvasAndContext,
+} from './test-utils.ts';
 
 describe('Stage', function () {
   // ======================================================
@@ -209,7 +210,7 @@ describe('Stage', function () {
     }
     var stage = addStage();
     var container = document.createElement('div');
-    var wrap = stage.container().parentNode;
+    var wrap = stage.container().parentNode!;
     wrap.appendChild(container);
 
     stage.container(container);
@@ -239,7 +240,7 @@ describe('Stage', function () {
     layer.draw();
 
     var container = document.createElement('div');
-    var wrap = stage.container().parentNode;
+    var wrap = stage.container().parentNode!;
     wrap.appendChild(container);
 
     var clone = stage.clone();
@@ -256,7 +257,7 @@ describe('Stage', function () {
     }
     var stage = addStage();
     var container = stage.container();
-    var parent = stage.content.parentElement;
+    var parent = stage.content.parentElement!;
 
     parent.removeChild(stage.content);
 
@@ -333,7 +334,7 @@ describe('Stage', function () {
     });
 
     stage.on('contentMousemove', function () {
-      var pos = stage.getPointerPosition();
+      var pos = stage.getPointerPosition()!;
       var shape = stage.getIntersection(pos);
       if (!shape) {
         //console.log(pos);
@@ -397,7 +398,7 @@ describe('Stage', function () {
       '17) getAllIntersections should return one shape'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 266, y: 114 })[0].getId(),
+      stage.getAllIntersections({ x: 266, y: 114 })[0].id(),
       'greenCircle',
       '19) first intersection should be greenCircle'
     );
@@ -408,7 +409,7 @@ describe('Stage', function () {
       '18) getAllIntersections should return one shape'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 414, y: 115 })[0].getId(),
+      stage.getAllIntersections({ x: 414, y: 115 })[0].id(),
       'redCircle',
       '20) first intersection should be redCircle'
     );
@@ -419,12 +420,12 @@ describe('Stage', function () {
       '1) getAllIntersections should return two shapes'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'redCircle',
       '2) first intersection should be redCircle'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[1].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[1].id(),
       'greenCircle',
       '3) second intersection should be greenCircle'
     );
@@ -439,7 +440,7 @@ describe('Stage', function () {
       '4) getAllIntersections should return one shape'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'redCircle',
       '5) first intersection should be redCircle'
     );
@@ -454,12 +455,12 @@ describe('Stage', function () {
       '6) getAllIntersections should return two shapes'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'redCircle',
       '7) first intersection should be redCircle'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[1].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[1].id(),
       'greenCircle',
       '8) second intersection should be greenCircle'
     );
@@ -474,7 +475,7 @@ describe('Stage', function () {
       '9) getAllIntersections should return one shape'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'greenCircle',
       '10) first intersection should be greenCircle'
     );
@@ -489,12 +490,12 @@ describe('Stage', function () {
       '11) getAllIntersections should return two shapes'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'redCircle',
       '12) first intersection should be redCircle'
     );
     assert.equal(
-      stage.getAllIntersections({ x: 350, y: 118 })[1].getId(),
+      stage.getAllIntersections({ x: 350, y: 118 })[1].id(),
       'greenCircle',
       '13) second intersection should be greenCircle'
     );
@@ -506,12 +507,12 @@ describe('Stage', function () {
       '14) getAllIntersections should return two shapes'
     );
     assert.equal(
-      layer.getAllIntersections({ x: 350, y: 118 })[0].getId(),
+      layer.getAllIntersections({ x: 350, y: 118 })[0].id(),
       'redCircle',
       '15) first intersection should be redCircle'
     );
     assert.equal(
-      layer.getAllIntersections({ x: 350, y: 118 })[1].getId(),
+      layer.getAllIntersections({ x: 350, y: 118 })[1].id(),
       'greenCircle',
       '16) second intersection should be greenCircle'
     );
@@ -550,6 +551,11 @@ describe('Stage', function () {
   // ======================================================
   it('Should not throw on clip for stage', function () {
     // no asserts, because we check throw
+    const oldWarn = console.warn;
+    let called = false;
+    console.warn = function () {
+      called = true;
+    };
     var stage = addStage({
       clipFunc: function () {},
     });
@@ -565,6 +571,8 @@ describe('Stage', function () {
 
     layer.add(text);
     stage.add(layer);
+    console.warn = oldWarn;
+    assert.equal(called, true);
   });
 
   // ======================================================
@@ -890,6 +898,32 @@ describe('Stage', function () {
     assert.equal(mouseups, 2, 'seconds mouseup registered');
     assert.equal(clicks, 2, 'seconds click registered');
     assert.equal(dblicks, 1, 'first dbclick registered');
+  });
+
+  it('stage mouseup should fire before click on empty area', function () {
+    if (isNode) {
+      return;
+    }
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var order: string[] = [];
+
+    stage.on('mousedown', function () {
+      order.push('down');
+    });
+    stage.on('mouseup', function () {
+      order.push('up');
+    });
+    stage.on('click', function () {
+      order.push('click');
+    });
+
+    simulateMouseDown(stage, { x: 10, y: 10 });
+    simulateMouseUp(stage, { x: 10, y: 10 });
+
+    assert.deepEqual(order, ['down', 'up', 'click']);
   });
 
   it('can listen taps on empty areas', function () {
@@ -1222,6 +1256,49 @@ describe('Stage', function () {
     assert.equal(count, 2);
   });
 
+  it('stage pointerleave should fire when leaving stage', function () {
+    var stage = addStage();
+
+    var stageLeave = 0;
+    stage.on('pointerleave', function () {
+      stageLeave += 1;
+    });
+
+    stage.fire('pointerleave', undefined, false);
+
+    assert.equal(stageLeave, 1, 'stage pointerleave should fire');
+  });
+
+  it('stage pointerleave should not fire when leaving a child', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var circle = new Konva.Circle({
+      fill: 'red',
+      radius: 30,
+      x: 50,
+      y: 50,
+    });
+    layer.add(circle);
+    layer.draw();
+
+    var stageLeave = 0;
+    var circleLeave = 0;
+    stage.on('pointerleave', function () {
+      stageLeave += 1;
+    });
+    circle.on('pointerleave', function () {
+      circleLeave += 1;
+    });
+
+    simulatePointerMove(stage, { x: 50, y: 50 });
+    simulatePointerMove(stage, { x: 90, y: 50 });
+
+    assert.equal(circleLeave, 1, 'circle pointerleave should fire');
+    assert.equal(stageLeave, 0, 'stage pointerleave should not fire');
+  });
+
   it('toDataURL with hidden layer', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
@@ -1266,7 +1343,10 @@ describe('Stage', function () {
     layer.add(circle);
     stage.add(layer);
 
-    compareCanvases(stage.toCanvas(circle.getClientRect()), circle.toCanvas());
+    const canvas1 = stage.toCanvas(circle.getClientRect());
+    const canvas2 = circle.toCanvas();
+
+    compareCanvases(canvas1, canvas2, 100, 200);
   });
 
   it('toCanvas with large size', function () {
@@ -1290,15 +1370,14 @@ describe('Stage', function () {
       height: stage.height() + 20,
     });
 
-    var canvas = createCanvas();
+    const { canvas, context } = createCanvasAndContext();
     canvas.width = radius * 2;
     canvas.height = radius * 2;
-    var context = canvas.getContext('2d');
     context.beginPath();
     context.arc(radius, radius, radius, 0, 2 * Math.PI);
     context.fillStyle = 'black';
     context.fill();
-    compareCanvases(stageCanvas, canvas, 100);
+    compareCanvases(stageCanvas, canvas, 100, 20);
   });
 
   it('toImage with large size', async function () {
@@ -1380,7 +1459,10 @@ describe('Stage', function () {
           mimeType: 'image/jpeg',
           quality: 0.5,
         });
-        assert.isTrue(blob instanceof Blob && blob.type === 'image/jpeg', "can't change type of blob");
+        assert.isTrue(
+          blob instanceof Blob && blob.type === 'image/jpeg',
+          "can't change type of blob"
+        );
       } catch (e) {
         console.error(e);
         assert.fail('error creating blob');

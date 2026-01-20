@@ -1,12 +1,12 @@
-import { Container } from './Container';
-import { Konva } from './Global';
-import { Node } from './Node';
-import { Vector2d } from './types';
-import { Util } from './Util';
+import type { Container } from './Container.ts';
+import { Konva } from './Global.ts';
+import type { Node } from './Node.ts';
+import type { Vector2d } from './types.ts';
+import { Util } from './Util.ts';
 
 export const DD = {
   get isDragging() {
-    var flag = false;
+    let flag = false;
     DD._dragElements.forEach((elem) => {
       if (elem.dragStatus === 'dragging') {
         flag = true;
@@ -17,7 +17,7 @@ export const DD = {
   justDragged: false,
   get node() {
     // return first dragging node
-    var node: Node | undefined;
+    let node: Node | undefined;
     DD._dragElements.forEach((elem) => {
       node = elem.node;
     });
@@ -62,8 +62,8 @@ export const DD = {
         return;
       }
       if (elem.dragStatus !== 'dragging') {
-        var dragDistance = node.dragDistance();
-        var distance = Math.max(
+        const dragDistance = node.dragDistance();
+        const distance = Math.max(
           Math.abs(pos.x - elem.startPointerPos.x),
           Math.abs(pos.y - elem.startPointerPos.y)
         );
@@ -161,10 +161,13 @@ export const DD = {
 if (Konva.isBrowser) {
   window.addEventListener('mouseup', DD._endDragBefore, true);
   window.addEventListener('touchend', DD._endDragBefore, true);
+  // add touchcancel to fix this: https://github.com/konvajs/konva/issues/1843
+  window.addEventListener('touchcancel', DD._endDragBefore, true);
 
   window.addEventListener('mousemove', DD._drag);
   window.addEventListener('touchmove', DD._drag);
 
   window.addEventListener('mouseup', DD._endDragAfter, false);
   window.addEventListener('touchend', DD._endDragAfter, false);
+  window.addEventListener('touchcancel', DD._endDragAfter, false);
 }

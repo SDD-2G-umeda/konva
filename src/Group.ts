@@ -1,8 +1,9 @@
-import { Util } from './Util';
-import { Container, ContainerConfig } from './Container';
-import { _registerNode } from './Global';
-import { Node } from './Node';
-import { Shape } from './Shape';
+import { Util } from './Util.ts';
+import type { ContainerConfig } from './Container.ts';
+import { Container } from './Container.ts';
+import { _registerNode } from './Global.ts';
+import type { Node } from './Node.ts';
+import type { Shape } from './Shape.ts';
 
 export interface GroupConfig extends ContainerConfig {}
 
@@ -19,7 +20,7 @@ export interface GroupConfig extends ContainerConfig {}
  */
 export class Group extends Container<Group | Shape> {
   _validateAdd(child: Node) {
-    var type = child.getType();
+    const type = child.getType();
     if (type !== 'Group' && type !== 'Shape') {
       Util.throw('You may only add groups and shapes to groups.');
     }

@@ -1,17 +1,16 @@
 import { assert } from 'chai';
-import KonvaModule from '../../src/index';
-import '../../src/index-node';
+import KonvaModule from '../../src/index.ts';
 
 export const Konva = KonvaModule;
 
-import * as canvas from 'canvas';
+// import * as canvas from 'canvas';
 
 Konva.enableTrace = true;
 Konva.showWarnings = true;
 
-import { imagediff } from './imagediff';
-import { Layer } from '../../src/Layer';
-import { Stage } from '../../src/Stage';
+import { imagediff } from './imagediff.ts';
+import type { Layer } from '../../src/Layer.ts';
+import type { Stage } from '../../src/Stage.ts';
 
 // reset some data
 beforeEach(function () {
@@ -22,8 +21,8 @@ beforeEach(function () {
 
 // clear after test
 afterEach(function () {
-  var isFailed = this.currentTest.state == 'failed';
-  var isManual = this.currentTest.parent.title === 'Manual';
+  var isFailed = this.currentTest?.state === 'failed';
+  var isManual = this.currentTest?.parent?.title === 'Manual';
 
   Konva.stages.forEach(function (stage) {
     clearTimeout(stage._mouseDblTimeout);
@@ -45,7 +44,7 @@ export const isNode = typeof global.document === 'undefined';
 export const isBrowser = !isNode;
 
 export function getContainer() {
-  return document.getElementById('konva-container');
+  return document.getElementById('konva-container')!;
 }
 
 export function addContainer() {
@@ -70,7 +69,7 @@ export function addStage(attrs?) {
   });
 
   if (!isNode) {
-    getContainer().appendChild(container);
+    getContainer().appendChild(container!);
   }
 
   return stage;
@@ -84,12 +83,14 @@ export function loadImage(url, callback) {
     url = (document.getElementById(url) as HTMLImageElement).src;
   }
 
-  return canvas
-    .loadImage(url)
-    .then(callback)
-    .catch((e) => {
-      console.error(e);
-    });
+  const image = Konva.Util.createImageElement();
+  image.onload = () => {
+    callback(image);
+  };
+  image.onerror = (e) => {
+    console.error('Error loading image', url, e);
+  };
+  image.src = url;
 }
 
 export function getPixelRatio() {
@@ -104,15 +105,13 @@ function get(element, content?) {
   return element;
 }
 
-export function compareCanvases(canvas1, canvas2, tol?, secondTol?) {
+export function compareCanvases(canvas1, canvas2, tol = 1, secondTol?) {
   // don't test in PhantomJS as it use old chrome engine
   // it it has opacity + shadow bug
   var equal = imagediff.equal(canvas1, canvas2, tol, secondTol);
   if (!equal) {
     const diff = imagediff.diff(canvas1, canvas2);
-    const diffCanvas = createCanvas();
-
-    const context = diffCanvas.getContext('2d');
+    const { canvas: diffCanvas, context } = createCanvasAndContext();
     context.putImageData(diff, 0, 0);
 
     var base64 = diffCanvas.toDataURL();
@@ -131,6 +130,14 @@ export function compareCanvases(canvas1, canvas2, tol?, secondTol?) {
       b.appendChild(canvas2);
       c.appendChild(diffCanvas);
       div.appendChild(b);
+      if (!canvas1.parentNode) {
+        const d = get('div', '<div>Original:</div>');
+        canvas1.style.position = '';
+        canvas1.style.display = '';
+        d.style.float = 'left';
+        d.appendChild(canvas1);
+        div.appendChild(d);
+      }
       div.appendChild(c);
       getContainer().appendChild(div);
     }
@@ -162,12 +169,13 @@ export function compareLayers(layer1: Layer, layer2: Layer, tol?, secondTol?) {
   );
 }
 
-export function createCanvas() {
-  var node = canvas.createCanvas(300, 300);
-  node.width = 578 * Konva.pixelRatio;
-  node.height = 200 * Konva.pixelRatio;
-  node.getContext('2d').scale(Konva.pixelRatio, Konva.pixelRatio);
-  return node;
+export function createCanvasAndContext() {
+  const canvas = Konva.Util.createCanvasElement();
+  canvas.width = 578 * Konva.pixelRatio;
+  canvas.height = 200 * Konva.pixelRatio;
+  const context = canvas.getContext('2d')!;
+  context.scale(Konva.pixelRatio, Konva.pixelRatio);
+  return { canvas, context };
 }
 
 export function showHit(layer) {
@@ -180,7 +188,10 @@ export function showHit(layer) {
   getContainer().appendChild(canvas);
 }
 
-export function simulateMouseDown(stage, pos) {
+export function simulateMouseDown(
+  stage: Stage,
+  pos: { x: number; y: number; button?: number }
+) {
   simulatePointerDown(stage, pos);
   var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
 
@@ -189,10 +200,13 @@ export function simulateMouseDown(stage, pos) {
     clientY: pos.y + top,
     button: pos.button || 0,
     type: 'mousedown',
-  });
+  } as any);
 }
 
-export function simulateMouseMove(stage, pos) {
+export function simulateMouseMove(
+  stage: Stage,
+  pos: { x: number; y: number; button?: number }
+) {
   simulatePointerMove(stage, pos);
   var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
   var evt = {
@@ -203,7 +217,7 @@ export function simulateMouseMove(stage, pos) {
   };
 
   Konva.DD._drag(evt);
-  stage._pointermove(evt);
+  stage._pointermove(evt as any);
 }
 
 export function simulateMouseUp(stage, pos) {
@@ -335,7 +349,13 @@ export function simulateTouchEnd(stage, pos, changed?) {
   Konva.DD._endDragAfter(evt);
 }
 
-export function simulatePointerDown(stage: Stage, pos) {
+type SimulatedPointerEvent = {
+  x: number;
+  y: number;
+  button?: number;
+  pointerId?: number;
+};
+export function simulatePointerDown(stage: Stage, pos: SimulatedPointerEvent) {
   var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
   stage._pointerdown({
     clientX: pos.x,
@@ -346,7 +366,7 @@ export function simulatePointerDown(stage: Stage, pos) {
   } as any);
 }
 
-export function simulatePointerMove(stage: Stage, pos) {
+export function simulatePointerMove(stage: Stage, pos: SimulatedPointerEvent) {
   var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
   var evt = {
     clientX: pos.x,
@@ -360,7 +380,7 @@ export function simulatePointerMove(stage: Stage, pos) {
   // Konva.DD._drag(evt);
 }
 
-export function simulatePointerUp(stage: Stage, pos) {
+export function simulatePointerUp(stage: Stage, pos: SimulatedPointerEvent) {
   var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
   var evt = {
     clientX: pos.x,
@@ -375,12 +395,12 @@ export function simulatePointerUp(stage: Stage, pos) {
   // Konva.DD._endDragAfter(evt);
 }
 
-function isClose(a, b) {
-  return Math.abs(a - b) < 0.000001;
+function isClose(a, b, tol = 0.000001) {
+  return Math.abs(a - b) < tol;
 }
 
-export const assertAlmostEqual = function (val1, val2) {
-  if (!isClose(val1, val2)) {
+export const assertAlmostEqual = function (val1, val2, tol = 0.000001) {
+  if (!isClose(val1, val2, tol)) {
     throw new Error('Expected ' + val1 + ' to be almost equal to ' + val2);
   }
 };

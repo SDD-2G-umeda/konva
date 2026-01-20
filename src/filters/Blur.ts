@@ -1,6 +1,7 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { getNumberValidator } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { getNumberValidator } from '../Validators.ts';
 /*
  the Gauss filter
  master repo: https://github.com/pavelpower/kineticjsGaussFilter
@@ -44,6 +45,7 @@ import { getNumberValidator } from '../Validators';
      WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
      FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
      OTHER DEALINGS IN THE SOFTWARE.
+     * @license MIT
      */
 
 function BlurStack(this: any) {
@@ -54,7 +56,7 @@ function BlurStack(this: any) {
   this.next = null;
 }
 
-var mul_table = [
+const mul_table = [
   512, 512, 456, 512, 328, 456, 335, 512, 405, 328, 271, 456, 388, 335, 292,
   512, 454, 405, 364, 328, 298, 271, 496, 456, 420, 388, 360, 335, 312, 292,
   273, 512, 482, 454, 428, 405, 383, 364, 345, 328, 312, 298, 284, 271, 259,
@@ -74,7 +76,7 @@ var mul_table = [
   289, 287, 285, 282, 280, 278, 275, 273, 271, 269, 267, 265, 263, 261, 259,
 ];
 
-var shg_table = [
+const shg_table = [
   9, 11, 12, 13, 13, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 17,
   17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19,
   19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
@@ -92,15 +94,11 @@ var shg_table = [
 ];
 
 function filterGaussBlurRGBA(imageData, radius) {
-  var pixels = imageData.data,
+  const pixels = imageData.data,
     width = imageData.width,
     height = imageData.height;
 
-  var x,
-    y,
-    i,
-    p,
-    yp,
+  let p,
     yi,
     yw,
     r_sum,
@@ -121,20 +119,21 @@ function filterGaussBlurRGBA(imageData, radius) {
     pa,
     rbs;
 
-  var div = radius + radius + 1,
+  const div = radius + radius + 1,
     widthMinus1 = width - 1,
     heightMinus1 = height - 1,
     radiusPlus1 = radius + 1,
     sumFactor = (radiusPlus1 * (radiusPlus1 + 1)) / 2,
     stackStart = new BlurStack(),
-    stackEnd = null,
-    stack = stackStart,
-    stackIn: any = null,
-    stackOut: any = null,
     mul_sum = mul_table[radius],
     shg_sum = shg_table[radius];
 
-  for (i = 1; i < div; i++) {
+  let stackEnd = null,
+    stack = stackStart,
+    stackIn: any = null,
+    stackOut: any = null;
+
+  for (let i = 1; i < div; i++) {
     stack = stack.next = new BlurStack();
     if (i === radiusPlus1) {
       stackEnd = stack;
@@ -145,7 +144,7 @@ function filterGaussBlurRGBA(imageData, radius) {
 
   yw = yi = 0;
 
-  for (y = 0; y < height; y++) {
+  for (let y = 0; y < height; y++) {
     r_in_sum =
       g_in_sum =
       b_in_sum =
@@ -168,7 +167,7 @@ function filterGaussBlurRGBA(imageData, radius) {
 
     stack = stackStart;
 
-    for (i = 0; i < radiusPlus1; i++) {
+    for (let i = 0; i < radiusPlus1; i++) {
       stack.r = pr;
       stack.g = pg;
       stack.b = pb;
@@ -176,7 +175,7 @@ function filterGaussBlurRGBA(imageData, radius) {
       stack = stack.next;
     }
 
-    for (i = 1; i < radiusPlus1; i++) {
+    for (let i = 1; i < radiusPlus1; i++) {
       p = yi + ((widthMinus1 < i ? widthMinus1 : i) << 2);
       r_sum += (stack.r = pr = pixels[p]) * (rbs = radiusPlus1 - i);
       g_sum += (stack.g = pg = pixels[p + 1]) * rbs;
@@ -193,7 +192,7 @@ function filterGaussBlurRGBA(imageData, radius) {
 
     stackIn = stackStart;
     stackOut = stackEnd;
-    for (x = 0; x < width; x++) {
+    for (let x = 0; x < width; x++) {
       pixels[yi + 3] = pa = (a_sum * mul_sum) >> shg_sum;
       if (pa !== 0) {
         pa = 255 / pa;
@@ -245,7 +244,7 @@ function filterGaussBlurRGBA(imageData, radius) {
     yw += width;
   }
 
-  for (x = 0; x < width; x++) {
+  for (let x = 0; x < width; x++) {
     g_in_sum =
       b_in_sum =
       a_in_sum =
@@ -269,7 +268,7 @@ function filterGaussBlurRGBA(imageData, radius) {
 
     stack = stackStart;
 
-    for (i = 0; i < radiusPlus1; i++) {
+    for (let i = 0; i < radiusPlus1; i++) {
       stack.r = pr;
       stack.g = pg;
       stack.b = pb;
@@ -277,9 +276,9 @@ function filterGaussBlurRGBA(imageData, radius) {
       stack = stack.next;
     }
 
-    yp = width;
+    let yp = width;
 
-    for (i = 1; i <= radius; i++) {
+    for (let i = 1; i <= radius; i++) {
       yi = (yp + x) << 2;
 
       r_sum += (stack.r = pr = pixels[yi]) * (rbs = radiusPlus1 - i);
@@ -302,7 +301,7 @@ function filterGaussBlurRGBA(imageData, radius) {
     yi = x;
     stackIn = stackStart;
     stackOut = stackEnd;
-    for (y = 0; y < height; y++) {
+    for (let y = 0; y < height; y++) {
       p = yi << 2;
       pixels[p + 3] = pa = (a_sum * mul_sum) >> shg_sum;
       if (pa > 0) {
@@ -365,7 +364,7 @@ function filterGaussBlurRGBA(imageData, radius) {
  * node.blurRadius(10);
  */
 export const Blur: Filter = function Blur(imageData) {
-  var radius = Math.round(this.blurRadius());
+  const radius = Math.round(this.blurRadius());
 
   if (radius > 0) {
     filterGaussBlurRGBA(imageData, radius);

@@ -1,13 +1,19 @@
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { GetSet, Vector2d } from '../types';
-import { getNumberValidator } from '../Validators';
-import { _registerNode } from '../Global';
-import { Context } from '../Context';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import type { GetSet, Vector2d } from '../types.ts';
+import {
+  getNumberOrArrayOfNumbersValidator,
+  getNumberValidator,
+} from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
+import type { Context } from '../Context.ts';
+import { Util } from '../Util.ts';
 
 export interface RegularPolygonConfig extends ShapeConfig {
   sides: number;
   radius: number;
+  cornerRadius?: number | number[];
 }
 /**
  * RegularPolygon constructor. Examples include triangles, squares, pentagons, hexagons, etc.
@@ -15,6 +21,7 @@ export interface RegularPolygonConfig extends ShapeConfig {
  * @memberof Konva
  * @augments Konva.Shape
  * @param {Object} config
+ * @param {Number} [config.cornerRadius]
  * @param {Number} config.sides
  * @param {Number} config.radius
  * @@shapeParams
@@ -32,13 +39,20 @@ export interface RegularPolygonConfig extends ShapeConfig {
  */
 export class RegularPolygon extends Shape<RegularPolygonConfig> {
   _sceneFunc(context: Context) {
-    const points = this._getPoints();
+    const points = this._getPoints(),
+      radius = this.radius(),
+      sides = this.sides(),
+      cornerRadius = this.cornerRadius();
 
     context.beginPath();
-    context.moveTo(points[0].x, points[0].y);
 
-    for (var n = 1; n < points.length; n++) {
-      context.lineTo(points[n].x, points[n].y);
+    if (!cornerRadius) {
+      context.moveTo(points[0].x, points[0].y);
+      for (let n = 1; n < points.length; n++) {
+        context.lineTo(points[n].x, points[n].y);
+      }
+    } else {
+      Util.drawRoundedPolygonPath(context, points, sides, radius, cornerRadius);
     }
 
     context.closePath();
@@ -48,7 +62,7 @@ export class RegularPolygon extends Shape<RegularPolygonConfig> {
     const sides = this.attrs.sides as number;
     const radius = this.attrs.radius || 0;
     const points: Vector2d[] = [];
-    for (var n = 0; n < sides; n++) {
+    for (let n = 0; n < sides; n++) {
       points.push({
         x: radius * Math.sin((n * 2 * Math.PI) / sides),
         y: -1 * radius * Math.cos((n * 2 * Math.PI) / sides),
@@ -59,10 +73,10 @@ export class RegularPolygon extends Shape<RegularPolygonConfig> {
   getSelfRect() {
     const points = this._getPoints();
 
-    var minX = points[0].x;
-    var maxX = points[0].y;
-    var minY = points[0].x;
-    var maxY = points[0].y;
+    let minX = points[0].x;
+    let maxX = points[0].x;
+    let minY = points[0].y;
+    let maxY = points[0].y;
     points.forEach((point) => {
       minX = Math.min(minX, point.x);
       maxX = Math.max(maxX, point.x);
@@ -91,6 +105,7 @@ export class RegularPolygon extends Shape<RegularPolygonConfig> {
 
   radius: GetSet<number, this>;
   sides: GetSet<number, this>;
+  cornerRadius: GetSet<number | number[], this>;
 }
 
 RegularPolygon.prototype.className = 'RegularPolygon';
@@ -127,3 +142,26 @@ Factory.addGetterSetter(RegularPolygon, 'radius', 0, getNumberValidator());
  * shape.sides(10);
  */
 Factory.addGetterSetter(RegularPolygon, 'sides', 0, getNumberValidator());
+
+/**
+ * get/set corner radius
+ * @method
+ * @name Konva.RegularPolygon#cornerRadius
+ * @param {Number} cornerRadius
+ * @returns {Number}
+ * @example
+ * // get corner radius
+ * var cornerRadius = poly.cornerRadius();
+ *
+ * // set corner radius
+ * poly.cornerRadius(10);
+ *
+ * // set different corner radius values (pentagon)
+ * poly.cornerRadius([0, 10, 20, 30, 40]);
+ */
+Factory.addGetterSetter(
+  RegularPolygon,
+  'cornerRadius',
+  0,
+  getNumberOrArrayOfNumbersValidator(4)
+);

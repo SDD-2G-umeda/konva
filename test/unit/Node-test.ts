@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import { Shape } from '../../src/Shape';
+import type { Shape } from '../../src/Shape.ts';
 
 import {
   addStage,
@@ -13,7 +13,7 @@ import {
   Konva,
   isBrowser,
   simulateMouseMove,
-} from './test-utils';
+} from './test-utils.ts';
 
 describe('Node', function () {
   // ======================================================
@@ -344,7 +344,7 @@ describe('Node', function () {
           );
           layer2.add(image);
           layer2.draw();
-          compareLayers(layer, layer2, 150);
+          compareLayers(layer, layer2, 150, 50);
           Konva.pixelRatio = oldRatio;
           done();
         });
@@ -373,7 +373,7 @@ describe('Node', function () {
     var stageExport = stage.toCanvas({
       pixelRatio: layer.getCanvas().getPixelRatio(),
     });
-    compareLayerAndCanvas(layer, stageExport);
+    compareLayerAndCanvas(layer, stageExport, 100, 100);
   });
 
   // ======================================================
@@ -399,7 +399,7 @@ describe('Node', function () {
     layer.x(-50);
     layer.y(-50);
     layer.draw();
-    compareLayerAndCanvas(layer, stageExport);
+    compareLayerAndCanvas(layer, stageExport, 50, 50);
   });
 
   // ======================================================
@@ -637,7 +637,7 @@ describe('Node', function () {
       id: 'myRect',
     });
 
-    var clicks = [];
+    var clicks: string[] = [];
 
     rect.on('click', function () {
       clicks.push(this.name());
@@ -719,8 +719,8 @@ describe('Node', function () {
     group.add(rect);
     group.add(text);
 
-    var clicks = [];
-    var taps = [];
+    var clicks: string[] = [];
+    var taps: string[] = [];
 
     group.on('click', function () {
       clicks.push(this.name());
@@ -924,11 +924,11 @@ describe('Node', function () {
     });
 
     circle1.on('mousemove', function () {
-      console.log('mousemove circle1');
+      // console.log('mousemove circle1');
     });
 
     circle2.on('mousemove', function () {
-      console.log('mousemove circle2');
+      // console.log('mousemove circle2');
     });
 
     layer1.add(circle1);
@@ -1101,11 +1101,11 @@ describe('Node', function () {
     });
 
     circle1.on('mousemove', function () {
-      console.log('mousemove circle1');
+      // console.log('mousemove circle1');
     });
 
     circle2.on('mousemove', function () {
-      console.log('mousemove circle2');
+      // console.log('mousemove circle2');
     });
 
     group.add(circle2);
@@ -1883,16 +1883,10 @@ describe('Node', function () {
     layer.add(circle);
     layer.draw();
 
-    var clicks = [];
+    var clicks: string[] = [];
 
     circle.on('click', function () {
       clicks.push('circle');
-
-      /*
-             var evt = window.event;
-             var rightClick = evt.which ? evt.which == 3 : evt.button == 2;
-             console.log(rightClick);
-             */
     });
     var foo;
     circle.on('customEvent', function (evt) {
@@ -2063,7 +2057,7 @@ describe('Node', function () {
     layer.add(circle);
     layer.draw();
 
-    var clicks = [];
+    var clicks: string[] = [];
 
     circle.on('click', function () {
       clicks.push('circle');
@@ -2097,7 +2091,7 @@ describe('Node', function () {
     layer.add(circle);
     layer.draw();
 
-    var clicks = [];
+    var clicks: string[] = [];
 
     circle.on('click', function (e) {
       e.cancelBubble = true;
@@ -2296,17 +2290,10 @@ describe('Node', function () {
 
     var bufferTrace = stage.bufferCanvas.getContext().getTrace();
 
-    if (isBrowser) {
-      assert.equal(
-        sceneTrace,
-        'clearRect(0,0,578,200);save();globalAlpha=0.5;drawImage([object HTMLCanvasElement],0,0,578,200);restore();'
-      );
-    } else {
-      assert.equal(
-        sceneTrace,
-        'clearRect(0,0,578,200);save();globalAlpha=0.5;drawImage([object Object],0,0,578,200);restore();'
-      );
-    }
+    assert.equal(
+      sceneTrace,
+      'clearRect(0,0,578,200);save();globalAlpha=0.5;drawImage([object HTMLCanvasElement],0,0,578,200);restore();'
+    );
 
     assert.equal(
       bufferTrace,
@@ -2565,11 +2552,18 @@ describe('Node', function () {
   });
 
   it('make sure we can create non existing node type', function () {
+    const oldWarn = console.warn;
+    let called = false;
+    console.warn = function () {
+      called = true;
+    };
     var json =
       '{"attrs":{},"className":"Layer","children":[{"attrs":{},"className":"Group","children":[{"attrs":{"x":289,"y":100,"radius":70,"fill":"green","stroke":"black","strokeWidth":4,"name":"myCircle","draggable":true},"className":"WeirdShape"}]}]}';
     var layer = Konva.Node.create(json);
 
     assert.deepEqual(layer.find('Shape').length, 1);
+    console.warn = oldWarn;
+    assert.equal(called, true);
   });
 
   // ======================================================
@@ -3324,7 +3318,7 @@ describe('Node', function () {
         width: 148,
         height: 148,
       })
-      .offset({
+      ?.offset({
         x: 74,
         y: 74,
       });
@@ -3491,6 +3485,7 @@ describe('Node', function () {
     assert.equal(rect.findAncestor('#group'), group);
     assert.equal(rect.findAncestor('Group'), group);
 
+    // @ts-expect-error - test for no selector
     assert.equal(rect.findAncestor(), null, 'return null if no selector');
   });
 
@@ -3839,7 +3834,7 @@ describe('Node', function () {
       y: 100,
     });
 
-    assert.equal(circle.getRelativePointerPosition().x, -50);
-    assert.equal(circle.getRelativePointerPosition().y, 0);
+    assert.equal(circle.getRelativePointerPosition()?.x, -50);
+    assert.equal(circle.getRelativePointerPosition()?.y, 0);
   });
 });

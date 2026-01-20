@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 
-import { addStage, Konva, loadImage } from '../unit/test-utils';
+import { addStage, Konva, loadImage } from '../unit/test-utils.ts';
 
 describe('Blur', function () {
   // ======================================================
@@ -268,10 +268,6 @@ describe('Blur', function () {
       darth.blurRadius(20);
       darth.drawHitFromCache(100);
       layer.draw();
-
-      //console.log(darth._getCanvasCache().hit.getContext().getTrace());
-
-      //assert.equal(darth._getCanvasCache().hit.getContext().getTrace(true), 'save();translate();beginPath();rect();closePath();save();fillStyle;fill();restore();restore();clearRect();getImageData();putImageData();');
 
       done();
     });

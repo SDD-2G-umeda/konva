@@ -3,6 +3,221 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 10.2.0 (2026-01-15)
+
+- Added `rotateAnchorAngle` property to `Transformer` to control the position of the rotation anchor around the bounding box
+
+## 10.1.0 (2026-01-14)
+
+- Added underline offset option and related test for Text Annotation
+- Fixed large memory usage on cache
+- Fix bounding box calculation for bezier lines
+- Fixed cached render with buffer canvas is used
+
+## 10.0.12 (2025-11-21)
+
+- Better canvas farbling detection logic
+
+## 10.0.11 (2025-11-20)
+
+- Fixed broken release
+
+## 10.0.10 (2025-11-20)
+
+- Update hit detection system to handle canvas farbling. Hit detection should work better on Brave browser. Thanks [@wiverson](https://github.com/wiverson) to the idea and implementation idea.
+
+## 10.0.9 (2025-11-08)
+
+- Fixed line-through rendering when letter spacing is used
+
+## 10.0.8 (2025-10-24)
+
+- Fixed opacity level when a cached shape has opacity, fill and stroke
+
+## 10.0.7 (2025-10-22)
+
+- Fixed image element size re-calculation when change is changed with transformer is used.
+
+## 10.0.6 (2025-10-22)
+
+- Better `Image.getClientRect()` calculation if an instance has no image attached yet
+
+## 10.0.5 (2025-10-22)
+
+- Simplify types to fix TS errors
+
+## 10.0.4 (2025-10-21)
+
+- Remove logs
+
+## 10.0.3 (2025-10-21)
+
+- Add text decoration options to TextPath: support for 'line-through' and combined styles with 'underline'
+
+## 10.0.2 (2025-09-10)
+
+- Fixed internal calculations for `TextPath` to return correct width and height
+
+## 10.0.1 (2025-09-09)
+
+- Fixed `line-through` render for center/right aligned text
+
+## 10.0.0 (2025-09-07)
+
+### Breaking Changes
+
+- **Breaking**: Konva module is fully migrated from CommonJS modules to ES modules. It may break some older bundlers and CommonJS environments. In CommonJS environment you have to use default property from require:
+
+```js
+// before
+const Konva = require('konva');
+
+// after
+const Konva = require('konva').default;
+```
+
+- **Breaking:** Dropped default support for node.js environment. Now you have to explicitly import it:
+
+```bash
+npm install canvas
+```
+
+```js
+import Konva from 'konva';
+import 'konva/canvas-backend';
+```
+
+Motivation: With increased usage of `konva` in SSR environments like Next.js, loading native canvas rendering on the server is unnecessary since we don't render canvas content server-side. Removing this requirement simplifies setup by avoiding native modules when they aren't needed.
+
+- Improved text positioning to match DOM/CSS rendering. To restore previous behaviour use `Konva.legacyTextRendering = true`. This should NOT break major part of the apps. But if you care about pixel-perfect position of text elements, that change may effect you.
+
+### New Features
+
+- Added new `skia` render backend for node.js:
+
+```bash
+npm install skia-canvas
+```
+
+```js
+import Konva from 'konva';
+import 'konva/skia-backend';
+```
+
+- Native filters support via `node.filters(['blur(10px)'])`. Native fitlers works MUCH faster if supported nativily (Chrome, Firefox). If there is no native support, Konva will automatially fallback to functional filter (on Safari).
+
+```js
+node.filters(['blur(10px')]);
+node.cache();
+```
+
+- New property `charRenderFunc` for `Konva.Text` for controlling "per-character-render". May be useful any character animations:
+
+```js
+var text = new Konva.Text({
+  x: 10,
+  y: 10,
+  text: 'AB',
+  fontSize: 20,
+  charRenderFunc: function ({ context, index }) {
+    if (index === 1) {
+      // shift only the second character
+      context.translate(0, 10);
+    }
+  },
+});
+```
+
+- **New**: Added `Konva.Filters.Brightness` filter in replace of deprecated `Konva.Filters.Brighten` to better match with css filters logic.
+- Added `cornerRadius` support for `Konva.RegularPolygon`
+- Added `miterLimit` property support for `Konva.Shape` to control line join appearance
+
+### Bug Fixes
+
+- Fixed corner radius render for `Konva.Rect` when negative width or height are used
+- Fixed TextPath rendering on right align for some fonts
+- Fixed crash when node inside transformer was destroyed
+- Fixed mouseup + click events order when clicked on empty area of stage
+- Fixed transformer drag behavior with non-draggable nodes
+
+### Technical Improvements
+
+- **Performance**: Rewrote Emboss and Solarize filters for improved performance and usability
+- Changed return type of `node.toImage()`
+- Brave detection and warning
+
+## 9.3.22 (2025-07-08)
+
+- Fixed possible crash on `node.to()` method
+
+## 9.3.21 (2025-07-07)
+
+- Fixed memory leaks on Tween destroy
+- Fixed incorrect export of stage/layer when internal nodes used buffer canvas for rendering
+- Fixed incorrect render of cached node when buffer canvas is used
+- Fixed incorrect path lenth calculations
+- Fixed `pointerleave` bubbling
+- Added `pointerleave` event in `Stage`
+
+## 9.3.20 (2025-03-20)
+
+- Fix text rendering when ellipses are used
+
+## 9.3.19 (2025-03-12)
+
+- Typescript fixes
+- Memory leak fixes
+
+## 9.3.18 (2024-12-23)
+
+- Fixed emoji split in multiple lines
+
+## 9.3.17 (2024-12-23)
+
+- Fixed `Arrow.getClientRect()`
+- Fixed emoji rendering with letterSpacing
+- Fixed line-through for justify text
+- Changes in letter spacing width calculations to match DOM rendering
+
+## 9.3.16 (2024-10-21)
+
+- Fix freeze on ios on touch cancel event
+- Typescript fixes
+
+## 9.3.15 (2024-09-09)
+
+- fix letter spacing for Hindi text
+- ts fixes
+
+### 9.3.14 (2024-07-16)
+
+- Fix shadow + corner radius for images
+- Support `fillRule` for `Konva.Shape` on hit graph
+
+### 9.3.13 (2024-07-05)
+
+- Fallback for `Konva.Text.measureSize()` when 2d context doesn't return full data
+
+### 9.3.12 (2024-06-20)
+
+- Fix stopped transforming when it was triggered by multi-touch
+- Fix svg `path.getPointAtLength()` calculations in some cases
+- Fix `shape.getClientRect()` when any of parents is cached
+
+### 9.3.11 (2024-05-23)
+
+- Fix chrome clear canvas issue
+- Typescript fixes
+
+### 9.3.9 (2024-05-20)
+
+- Fix underline and line-through for `Konva.Text` when `Konva._fixTextRendering = true`
+
+### 9.3.8 (2024-05-15)
+
+- Fix click events fires on stage
+- Temporary `Konva._fixTextRendering = true` flag to fix inconsistent text
+
 ### 9.3.6 (2024-03-04)
 
 - Fix transformer bug to enable hit graph back
@@ -1287,7 +1502,6 @@ That changes are private and internal specific. They should not break most of `K
 Differences from last official `KineticJS` release
 
 - Bug Fixes
-
   - `strokeScaleEnabled = false` is disabled for text as I can not find a way to implement this
   - `strokeScaleEnabled = false` for Line now creates a correct hit graph
   - working "this-example" as name for nodes

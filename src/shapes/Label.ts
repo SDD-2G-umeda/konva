@@ -1,21 +1,22 @@
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { Group } from '../Group';
-import { Context } from '../Context';
-import { ContainerConfig } from '../Container';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { Group } from '../Group.ts';
+import type { Context } from '../Context.ts';
+import type { ContainerConfig } from '../Container.ts';
 import {
   getNumberOrArrayOfNumbersValidator,
   getNumberValidator,
-} from '../Validators';
-import { _registerNode } from '../Global';
+} from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
 
-import { GetSet } from '../types';
-import { Text } from './Text';
+import type { GetSet } from '../types.ts';
+import type { Text } from './Text.ts';
 
 export interface LabelConfig extends ContainerConfig {}
 
 // constants
-var ATTR_CHANGE_LIST = [
+const ATTR_CHANGE_LIST = [
     'fontFamily',
     'fontSize',
     'fontStyle',
@@ -105,9 +106,9 @@ export class Label extends Group {
     return this.find('Tag')[0] as Tag;
   }
   _addListeners(text) {
-    var that = this,
+    let that = this,
       n;
-    var func = function () {
+    const func = function () {
       that._sync();
     };
 
@@ -123,7 +124,7 @@ export class Label extends Group {
     return this.getText().height();
   }
   _sync() {
-    var text = this.getText(),
+    let text = this.getText(),
       tag = this.getTag(),
       width,
       height,
@@ -200,7 +201,7 @@ export interface TagConfig extends ShapeConfig {
  */
 export class Tag extends Shape<TagConfig> {
   _sceneFunc(context: Context) {
-    var width = this.width(),
+    const width = this.width(),
       height = this.height(),
       pointerDirection = this.pointerDirection(),
       pointerWidth = this.pointerWidth(),
@@ -289,7 +290,7 @@ export class Tag extends Shape<TagConfig> {
     context.fillStrokeShape(this);
   }
   getSelfRect() {
-    var x = 0,
+    let x = 0,
       y = 0,
       pointerWidth = this.pointerWidth(),
       pointerHeight = this.pointerHeight(),
@@ -317,7 +318,10 @@ export class Tag extends Shape<TagConfig> {
     };
   }
 
-  pointerDirection: GetSet<'left' | 'top' | 'right' | 'bottom', this>;
+  pointerDirection: GetSet<
+    'left' | 'up' | 'right' | 'down' | typeof NONE,
+    this
+  >;
   pointerWidth: GetSet<number, this>;
   pointerHeight: GetSet<number, this>;
   cornerRadius: GetSet<number, this>;

@@ -1,16 +1,17 @@
-import { Factory } from './Factory';
-import { Node, NodeConfig } from './Node';
-import { getNumberValidator } from './Validators';
-
-import { GetSet, IRect } from './types';
-import { Shape } from './Shape';
-import { HitCanvas, SceneCanvas } from './Canvas';
-import { SceneContext } from './Context';
+import type { HitCanvas, SceneCanvas } from './Canvas.ts';
+import type { SceneContext } from './Context.ts';
+import { Factory } from './Factory.ts';
+import type { NodeConfig } from './Node.ts';
+import { Node } from './Node.ts';
+import type { Shape } from './Shape.ts';
+import type { GetSet, IRect } from './types.ts';
+import { getNumberValidator } from './Validators.ts';
 
 export type ClipFuncOutput =
   | void
   | [Path2D | CanvasFillRule]
   | [Path2D, CanvasFillRule];
+
 export interface ContainerConfig extends NodeConfig {
   clearBeforeDraw?: boolean;
   clipFunc?: (ctx: SceneContext) => ClipFuncOutput;
@@ -31,8 +32,9 @@ export interface ContainerConfig extends NodeConfig {
  * @@containerParams
  */
 export abstract class Container<
-  ChildType extends Node = Node
-> extends Node<ContainerConfig> {
+  ChildType extends Node = Node,
+  Config extends ContainerConfig = ContainerConfig,
+> extends Node<Config> {
   children: Array<ChildType> = [];
 
   /**
@@ -51,18 +53,11 @@ export abstract class Container<
    * });
    */
   getChildren(filterFunc?: (item: Node) => boolean) {
-    if (!filterFunc) {
-      return this.children || [];
-    }
-
     const children = this.children || [];
-    var results: Array<ChildType> = [];
-    children.forEach(function (child) {
-      if (filterFunc(child)) {
-        results.push(child);
-      }
-    });
-    return results;
+    if (filterFunc) {
+      return children.filter(filterFunc);
+    }
+    return children;
   }
   /**
    * determine if node has children
@@ -120,15 +115,13 @@ export abstract class Container<
    * layer.add(shape1, shape2, shape3);
    * // empty arrays are accepted, though each individual child must be defined
    * layer.add(...shapes);
-   * // remember to redraw layer if you changed something
-   * layer.draw();
    */
   add(...children: ChildType[]) {
     if (children.length === 0) {
       return this;
     }
     if (children.length > 1) {
-      for (var i = 0; i < children.length; i++) {
+      for (let i = 0; i < children.length; i++) {
         this.add(children[i]);
       }
       return this;
@@ -223,19 +216,19 @@ export abstract class Container<
   findOne<ChildNode extends Node = Node>(
     selector: string | Function
   ): ChildNode | undefined {
-    var result = this._generalFind<ChildNode>(selector, true);
+    const result = this._generalFind<ChildNode>(selector, true);
     return result.length > 0 ? result[0] : undefined;
   }
   _generalFind<ChildNode extends Node>(
     selector: string | Function,
     findOne: boolean
   ) {
-    var retArr: Array<ChildNode> = [];
+    const retArr: Array<ChildNode> = [];
 
     this._descendants((node) => {
       const valid = node._isMatch(selector);
       if (valid) {
-        retArr.push(node as unknown as ChildNode);
+        retArr.push(node as ChildNode);
       }
       if (valid && findOne) {
         return true;
@@ -265,7 +258,7 @@ export abstract class Container<
   }
   // extenders
   toObject() {
-    var obj = Node.prototype.toObject.call(this);
+    const obj = Node.prototype.toObject.call(this);
 
     obj.children = [];
 
@@ -283,7 +276,7 @@ export abstract class Container<
    * @param {Konva.Node} node
    */
   isAncestorOf(node: Node) {
-    var parent = node.getParent();
+    let parent = node.getParent();
     while (parent) {
       if (parent._id === this._id) {
         return true;
@@ -295,7 +288,7 @@ export abstract class Container<
   }
   clone(obj?: any) {
     // call super method
-    var node = Node.prototype.clone.call(this, obj);
+    const node = Node.prototype.clone.call(this, obj);
 
     this.getChildren().forEach(function (no) {
       node.add(no.clone());
@@ -307,6 +300,7 @@ export abstract class Container<
    * canvas and redraw every shape inside the container, it should only be used for special situations
    * because it performs very poorly.  Please use the {@link Konva.Stage#getIntersection} method if at all possible
    * because it performs much better
+   * nodes with listening set to false will not be detected
    * @method
    * @name Konva.Container#getAllIntersections
    * @param {Object} pos
@@ -315,7 +309,7 @@ export abstract class Container<
    * @returns {Array} array of shapes
    */
   getAllIntersections(pos) {
-    var arr: Shape[] = [];
+    const arr: Shape[] = [];
 
     this.find<Shape>('Shape').forEach((shape) => {
       if (shape.isVisible() && shape.intersects(pos)) {
@@ -343,20 +337,20 @@ export abstract class Container<
     this._requestDraw();
   }
   drawScene(can?: SceneCanvas, top?: Node, bufferCanvas?: SceneCanvas) {
-    var layer = this.getLayer()!,
+    const layer = this.getLayer()!,
       canvas = can || (layer && layer.getCanvas()),
       context = canvas && canvas.getContext(),
       cachedCanvas = this._getCanvasCache(),
       cachedSceneCanvas = cachedCanvas && cachedCanvas.scene;
 
-    var caching = canvas && canvas.isCache;
+    const caching = canvas && canvas.isCache;
     if (!this.isVisible() && !caching) {
       return this;
     }
 
     if (cachedSceneCanvas) {
       context.save();
-      var m = this.getAbsoluteTransform(top).getMatrix();
+      const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       this._drawCachedSceneCanvas(context);
       context.restore();
@@ -370,7 +364,7 @@ export abstract class Container<
       return this;
     }
 
-    var layer = this.getLayer()!,
+    const layer = this.getLayer()!,
       canvas = can || (layer && layer.hitCanvas),
       context = canvas && canvas.getContext(),
       cachedCanvas = this._getCanvasCache(),
@@ -378,7 +372,7 @@ export abstract class Container<
 
     if (cachedHitCanvas) {
       context.save();
-      var m = this.getAbsoluteTransform(top).getMatrix();
+      const m = this.getAbsoluteTransform(top).getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       this._drawCachedHitCanvas(context);
       context.restore();
@@ -388,7 +382,7 @@ export abstract class Container<
     return this;
   }
   _drawChildren(drawMethod, canvas, top, bufferCanvas?) {
-    var context = canvas && canvas.getContext(),
+    const context = canvas && canvas.getContext(),
       clipWidth = this.clipWidth(),
       clipHeight = this.clipHeight(),
       clipFunc = this.clipFunc(),
@@ -400,16 +394,16 @@ export abstract class Container<
 
     if (hasClip) {
       context.save();
-      var transform = this.getAbsoluteTransform(top);
-      var m = transform.getMatrix();
+      const transform = this.getAbsoluteTransform(top);
+      let m = transform.getMatrix();
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       context.beginPath();
       let clipArgs;
       if (clipFunc) {
         clipArgs = clipFunc.call(this, context, this);
       } else {
-        var clipX = this.clipX();
-        var clipY = this.clipY();
+        const clipX = this.clipX();
+        const clipY = this.clipY();
         context.rect(clipX || 0, clipY || 0, clipWidth, clipHeight);
       }
       context.clip.apply(context, clipArgs);
@@ -417,7 +411,7 @@ export abstract class Container<
       context.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
     }
 
-    var hasComposition =
+    const hasComposition =
       !selfCache &&
       this.globalCompositeOperation() !== 'source-over' &&
       drawMethod === 'drawScene';
@@ -447,24 +441,24 @@ export abstract class Container<
       relativeTo?: Container<Node>;
     } = {}
   ): IRect {
-    var skipTransform = config.skipTransform;
-    var relativeTo = config.relativeTo;
+    const skipTransform = config.skipTransform;
+    const relativeTo = config.relativeTo;
 
-    var minX, minY, maxX, maxY;
-    var selfRect = {
+    let minX, minY, maxX, maxY;
+    let selfRect = {
       x: Infinity,
       y: Infinity,
       width: 0,
       height: 0,
     };
-    var that = this;
+    const that = this;
     this.children?.forEach(function (child) {
       // skip invisible children
       if (!child.visible()) {
         return;
       }
 
-      var rect = child.getClientRect({
+      const rect = child.getClientRect({
         relativeTo: that,
         skipShadow: config.skipShadow,
         skipStroke: config.skipStroke,
@@ -490,10 +484,10 @@ export abstract class Container<
     });
 
     // if child is group we need to make sure it has visible shapes inside
-    var shapes = this.find('Shape');
-    var hasVisible = false;
-    for (var i = 0; i < shapes.length; i++) {
-      var shape = shapes[i];
+    const shapes = this.find('Shape');
+    let hasVisible = false;
+    for (let i = 0; i < shapes.length; i++) {
+      const shape = shapes[i];
       if (shape._isVisible(this)) {
         hasVisible = true;
         break;

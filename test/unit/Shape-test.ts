@@ -5,7 +5,7 @@ import {
   simulateMouseDown,
   simulateMouseMove,
   simulateMouseUp,
-  createCanvas,
+  createCanvasAndContext,
   isBrowser,
   isNode,
   compareLayerAndCanvas,
@@ -13,7 +13,9 @@ import {
   loadImage,
   Konva,
   compareCanvases,
-} from './test-utils';
+} from './test-utils.ts';
+
+import { getOffsetY } from './Text-test.ts';
 
 describe('Shape', function () {
   // ======================================================
@@ -498,8 +500,7 @@ describe('Shape', function () {
     assert.equal(rect.x(), 100);
     assert.equal(rect.y(), 50);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     // rect
     context.beginPath();
@@ -570,8 +571,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -615,8 +615,7 @@ describe('Shape', function () {
     assert.equal(rect.x(), 100);
     assert.equal(rect.y(), 50);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     // rect
     context.beginPath();
@@ -663,8 +662,7 @@ describe('Shape', function () {
 
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     // stroke
     context.beginPath();
@@ -709,8 +707,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -720,8 +717,7 @@ describe('Shape', function () {
     context.fill();
     context.stroke();
 
-    var c2 = createCanvas();
-    var ctx2 = c2.getContext('2d');
+    const { canvas: c2, context: ctx2 } = createCanvasAndContext();
     ctx2.shadowColor = 'grey';
     ctx2.shadowBlur = 10 * Konva.pixelRatio;
     ctx2.shadowOffsetX = 20 * Konva.pixelRatio;
@@ -772,8 +768,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.3;
 
     // draw shadow
@@ -852,8 +847,7 @@ describe('Shape', function () {
     layer.add(text);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     context.save();
     context.shadowColor = 'black';
@@ -861,14 +855,14 @@ describe('Shape', function () {
     context.shadowOffsetX = 20 * Konva.pixelRatio;
     context.shadowOffsetY = 20 * Konva.pixelRatio;
     context.font = 'normal 50px Arial';
-    context.textBaseline = 'middle';
+    context.textBaseline = 'alphabetic';
 
     context.fillStyle = 'green';
-    context.fillText('Test TEXT', 50, 75);
+    context.fillText('Test TEXT', 50, 50 + getOffsetY(context));
 
     context.lineWidth = 2;
     context.strokeStyle = 'black';
-    context.strokeText('Test TEXT', 50, 75);
+    context.strokeText('Test TEXT', 50, 50 + getOffsetY(context));
 
     context.stroke();
     context.fill();
@@ -876,14 +870,14 @@ describe('Shape', function () {
 
     // draw text again to remove shadow under stroke
     context.font = 'normal 50px Arial';
-    context.textBaseline = 'middle';
-    context.fillText('Test TEXT', 50, 75);
+    context.textBaseline = 'alphabetic';
+    context.fillText('Test TEXT', 50, 50 + getOffsetY(context));
     context.fillStyle = 'green';
-    context.fillText('Test TEXT', 50, 75);
+    context.fillText('Test TEXT', 50, 50 + getOffsetY(context));
 
     context.lineWidth = 2;
     context.strokeStyle = 'black';
-    context.strokeText('Test TEXT', 50, 75);
+    context.strokeText('Test TEXT', 50, 50 + getOffsetY(context));
 
     compareLayerAndCanvas(layer, canvas, 254, 10);
   });
@@ -968,6 +962,9 @@ describe('Shape', function () {
 
     rect.strokeWidth(8);
     assert.equal(rect.strokeWidth(), 8);
+
+    rect.miterLimit(5);
+    assert.equal(rect.miterLimit(), 5);
 
     const f = () => {};
     rect.sceneFunc(f);
@@ -1160,6 +1157,8 @@ describe('Shape', function () {
     // no we should hit the rect
     assert.equal(stage.getIntersection({ x: 5, y: 5 }), rect);
 
+    const oldWarn = console.warn;
+    console.warn = function () {};
     rect.strokeHitEnabled(false);
 
     assert.equal(rect.hitStrokeWidth(), 0);
@@ -1171,15 +1170,7 @@ describe('Shape', function () {
     rect.hitStrokeWidth(0);
 
     assert.equal(rect.strokeHitEnabled(), false);
-
-    // var trace = layer
-    //   .getHitCanvas()
-    //   .getContext()
-    //   .getTrace(true);
-    // assert.equal(
-    //   trace,
-    //   'clearRect();save();transform();beginPath();rect();closePath();save();fillStyle;fill();restore();restore();'
-    // );
+    console.warn = oldWarn;
   });
 
   it('enable hitStrokeWidth even if we have no stroke on scene', function () {
@@ -1258,8 +1249,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     // rect
     context.beginPath();
     context.rect(100, 100, 50, 50);
@@ -1304,8 +1294,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     // rect
     context.beginPath();
     context.rect(50, 100, 50, 50);
@@ -1353,8 +1342,7 @@ describe('Shape', function () {
     layer.add(group);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     // rect
     context.beginPath();
     context.rect(100, 100, 50, 50);
@@ -1398,8 +1386,7 @@ describe('Shape', function () {
 
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     // stroke
     context.beginPath();
@@ -1442,8 +1429,7 @@ describe('Shape', function () {
 
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     // stroke
     context.beginPath();
@@ -1456,8 +1442,7 @@ describe('Shape', function () {
     context.fill();
     context.stroke();
 
-    var canvas2 = createCanvas();
-    var context2 = canvas2.getContext('2d');
+    const { canvas: canvas2, context: context2 } = createCanvasAndContext();
     context2.globalAlpha = 0.5;
     context2.drawImage(canvas, 0, 0, canvas.width / 2, canvas.height / 2);
 
@@ -1550,6 +1535,83 @@ describe('Shape', function () {
     compareCanvases(canvas2, canvas1, 240, 110);
   });
 
+  it('export stage when buffer canvas is for line', async function () {
+    var stage = addStage();
+
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    const group = new Konva.Group({
+      id: 'group01',
+      draggable: false,
+      opacity: 0.99,
+    });
+    layer.add(group);
+
+    const arrow = new Konva.Arrow({
+      x: 0,
+      y: 0,
+      points: [50, 25, 200, 25, 200, 225, 400, 225],
+      stroke: 'purple',
+      fill: 'purple',
+      strokeWidth: 4,
+      pointerAtEnding: true,
+      bezier: true,
+    });
+    group.add(arrow);
+
+    const bounds = layer.getClientRect({ relativeTo: stage });
+    const pos = stage.getPosition();
+
+    const canvas1 = layer.toCanvas({
+      pixelRatio: 1,
+      x: bounds.x + pos.x,
+      y: bounds.y + pos.y,
+      width: bounds.width,
+      height: bounds.height,
+    });
+    group.opacity(1);
+    const canvas2 = layer.toCanvas({
+      pixelRatio: 1,
+      x: bounds.x + pos.x,
+      y: bounds.y + pos.y,
+      width: bounds.width,
+      height: bounds.height,
+    });
+
+    compareCanvases(canvas1, canvas2, 240, 110);
+  });
+
+  it('check stroke rendering on buffer canvas', async function () {
+    var stage = addStage();
+
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    const rect = new Konva.Rect({
+      x: 150,
+      y: 50,
+      width: 50,
+      height: 50,
+      fill: '#039BE5',
+      stroke: 'yellow',
+      strokeWidth: 5,
+      shadowColor: 'black',
+      shadowOffset: { x: 10, y: 10 },
+      shadowOpacity: 0.5,
+    });
+
+    layer.add(rect);
+
+    const canvas1 = layer.toCanvas();
+    rect.cache();
+    const canvas2 = layer.toCanvas();
+
+    // throw new Error('stop');
+
+    compareCanvases(canvas1, canvas2);
+  });
+
   // ======================================================
   it('optional disable shadow for stroke', function () {
     var stage = addStage();
@@ -1576,8 +1638,7 @@ describe('Shape', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -1651,6 +1712,35 @@ describe('Shape', function () {
 
     assert.equal(rect.width, 100, 'should not effect width');
     assert.equal(rect.height, 100, 'should not effect width');
+  });
+
+  it('getClientRect should not use cached values', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    var shape = new Konva.Rect({
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      fill: 'green',
+      stroke: 'black',
+      strokeWidth: 4,
+      strokeEnabled: false,
+      shadowOffsetX: 10,
+      shadowEnabled: false,
+    });
+
+    layer.add(shape);
+    stage.add(layer);
+
+    layer.cache();
+
+    layer.scaleX(2);
+
+    const rect = shape.getClientRect();
+
+    assert.equal(rect.x, 200);
   });
 
   it('getClientRect for shape in transformed parent', function () {
@@ -1875,9 +1965,9 @@ describe('Shape', function () {
       var oldCreate = ctx.createPattern;
 
       var callCount = 0;
-      ctx.createPattern = function () {
+      ctx.createPattern = function (...args) {
         callCount += 1;
-        return oldCreate.apply(this, arguments);
+        return oldCreate.apply(this, args);
       };
 
       layer.draw();
@@ -1973,9 +2063,9 @@ describe('Shape', function () {
     var oldCreate = ctx.createLinearGradient;
 
     var callCount = 0;
-    ctx.createLinearGradient = function () {
+    ctx.createLinearGradient = function (...args) {
       callCount += 1;
-      return oldCreate.apply(this, arguments);
+      return oldCreate.apply(this, args);
     };
 
     layer.draw();
@@ -2071,9 +2161,9 @@ describe('Shape', function () {
     var oldCreate = ctx.createRadialGradient;
 
     var callCount = 0;
-    ctx.createRadialGradient = function () {
+    ctx.createRadialGradient = function (...args) {
       callCount += 1;
-      return oldCreate.apply(this, arguments);
+      return oldCreate.apply(this, args);
     };
 
     layer.draw();
@@ -2244,8 +2334,7 @@ describe('Shape', function () {
     var layer = new Konva.Layer();
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var ctx = canvas.getContext('2d');
+    const { canvas, context: ctx } = createCanvasAndContext();
 
     var gradient = ctx.createLinearGradient(0, 75, 100, 75);
     gradient.addColorStop(0.0, 'rgba(255,255,255,1)');
@@ -2273,5 +2362,91 @@ describe('Shape', function () {
 
     assert.equal(callCount, 0);
     Konva.Util.warn = oldWarn;
+  });
+
+  it('fill rule on hit graph', function () {
+    var stage = addStage();
+
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    var mask = new Konva.Shape({
+      sceneFunc: function (ctx, shape) {
+        ctx.beginPath();
+        ctx.rect(0, 0, 500, 500);
+        ctx.rect(100, 100, 100, 100);
+        ctx.closePath();
+        ctx.fillShape(shape);
+      },
+      draggable: true,
+      fill: 'red',
+      fillRule: 'evenodd',
+    });
+
+    layer.add(mask);
+    layer.draw();
+    const trace = layer.getContext().getTrace();
+
+    assert.equal(
+      trace,
+      'clearRect(0,0,578,200);clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();rect(0,0,500,500);rect(100,100,100,100);closePath();fillStyle=red;fill(evenodd);restore();'
+    );
+
+    const hitShape = layer.getIntersection({ x: 150, y: 150 });
+    assert.equal(hitShape, null);
+  });
+
+  it('miterLimit with buffer canvas', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+
+    // Sharp triangle with opacity to force buffer canvas usage
+    var triangle = new Konva.Shape({
+      x: 100,
+      y: 50,
+      sceneFunc: function (ctx, shape) {
+        ctx.beginPath();
+        ctx.moveTo(140, 5);
+        ctx.lineTo(0, 70);
+        ctx.lineTo(220, 70);
+        ctx.closePath();
+        ctx.fillStrokeShape(shape);
+      },
+      fill: 'yellow',
+      stroke: 'orange',
+      strokeWidth: 10,
+      lineJoin: 'miter',
+      miterLimit: 3,
+      opacity: 0.7, // Forces buffer canvas usage
+    });
+
+    layer.add(triangle);
+    stage.add(layer);
+
+    // Create expected result using native canvas with buffer approach
+    const { canvas, context } = createCanvasAndContext();
+
+    // Draw on buffer first
+    context.beginPath();
+    context.translate(100, 50);
+    context.moveTo(140, 5);
+    context.lineTo(0, 70);
+    context.lineTo(220, 70);
+    context.closePath();
+    context.fillStyle = 'yellow';
+    context.strokeStyle = 'orange';
+    context.lineWidth = 10;
+    context.lineJoin = 'miter';
+    context.miterLimit = 3;
+    context.fill();
+    context.stroke();
+
+    // Apply opacity by drawing to final canvas
+    const { canvas: finalCanvas, context: finalContext } =
+      createCanvasAndContext();
+    finalContext.globalAlpha = 0.7;
+    finalContext.drawImage(canvas, 0, 0);
+
+    compareLayerAndCanvas(layer, finalCanvas, 200);
   });
 });

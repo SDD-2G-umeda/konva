@@ -4,11 +4,12 @@ import {
   Konva,
   compareLayerAndCanvas,
   cloneAndCompareLayer,
+  compareLayers,
   compareCanvases,
-  createCanvas,
+  createCanvasAndContext,
   loadImage,
   getPixelRatio,
-} from './test-utils';
+} from './test-utils.ts';
 
 describe('Caching', function () {
   it('cache simple rectangle', function () {
@@ -29,8 +30,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -60,8 +60,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.translate(100, 50);
     context.rotate(Math.PI / 4);
     context.beginPath();
@@ -93,8 +92,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -125,8 +123,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.3;
     context.beginPath();
     context.rect(100, 50, 100, 50);
@@ -140,6 +137,7 @@ describe('Caching', function () {
     var stage = addStage();
 
     var layer = new Konva.Layer();
+    stage.add(layer);
 
     var rect = new Konva.Rect({
       x: 100,
@@ -151,13 +149,13 @@ describe('Caching', function () {
       stroke: 'black',
       strokeWidth: 10,
     });
-    rect.cache();
-    rect.opacity(0.3);
 
     layer.add(rect);
-    stage.add(layer);
+    rect.cache();
+    layer.draw();
 
-    cloneAndCompareLayer(layer, 100);
+    // important to NOT use tollerance, because opacity is sensative
+    cloneAndCompareLayer(layer, 1);
   });
 
   // skip, because opacity rendering of cached shape is different
@@ -209,8 +207,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -244,8 +241,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     context.translate(100, 50);
     context.beginPath();
@@ -281,8 +277,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     context.translate(100, 50);
     context.beginPath();
@@ -346,8 +341,7 @@ describe('Caching', function () {
     layer.add(rect);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     context.translate(50, 25);
     context.beginPath();
@@ -384,8 +378,7 @@ describe('Caching', function () {
     layer.add(group);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 50);
     context.closePath();
@@ -461,8 +454,7 @@ describe('Caching', function () {
     layer.add(group);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     // draw rect
     context.save();
@@ -574,8 +566,7 @@ describe('Caching', function () {
     layer.add(group);
     stage.add(layer);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
 
     // draw rect
     context.save();
@@ -630,8 +621,7 @@ describe('Caching', function () {
 
     assert.equal(circle._getCanvasCache(), undefined);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     // circle
     context.save();
     context.beginPath();
@@ -831,7 +821,6 @@ describe('Caching', function () {
     group.cache();
 
     const canvas = group._cache.get('canvas').scene;
-    console.log(canvas.width / 2);
     assert.equal(canvas.width, 106 * canvas.pixelRatio);
   });
 
@@ -859,8 +848,7 @@ describe('Caching', function () {
     group.cache();
     layer.draw();
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     context.beginPath();
     context.rect(100, 50, 100, 50);
@@ -892,8 +880,7 @@ describe('Caching', function () {
     layer.visible(true);
     layer.draw();
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 100);
     context.closePath();
@@ -961,8 +948,7 @@ describe('Caching', function () {
     layer.listening(true);
     layer.draw();
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 100);
     context.closePath();
@@ -1000,8 +986,7 @@ describe('Caching', function () {
     layer.visible(true);
     layer.draw();
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.globalAlpha = 0.5;
     context.beginPath();
     context.rect(100, 50, 100, 100);
@@ -1536,8 +1521,7 @@ describe('Caching', function () {
     assert.equal(hitCanvas._canvas.height, rect.height() * 0.2);
     assert.equal(hitCanvas.pixelRatio, 0.2);
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     context.beginPath();
     context.rect(100, 50, 100, 100);
     context.closePath();
@@ -1547,5 +1531,85 @@ describe('Caching', function () {
     compareLayerAndCanvas(layer, canvas, 5);
 
     assert.equal(stage.getIntersection({ x: 150, y: 100 }), rect);
+  });
+
+  it('cache group with shape with shadow', function () {
+    // Replicate the exact structure from sandbox.html
+    var stage = addStage();
+
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    // Group (name: 'node')
+    var outerGroup = new Konva.Group({
+      name: 'node',
+    });
+    layer.add(outerGroup);
+
+    // Group (name: 'node-group', id: 'root_node', x: 25, y: 25)
+    var nodeGroup = new Konva.Group({
+      name: 'node-group',
+      id: 'root_node',
+      x: 25,
+      y: 25,
+    });
+    outerGroup.add(nodeGroup);
+
+    // Group (empty)
+    var innerGroup = new Konva.Group();
+    nodeGroup.add(innerGroup);
+
+    // Group (name: 'ports-group')
+    var portsGroup = new Konva.Group({
+      name: 'ports-group',
+    });
+    innerGroup.add(portsGroup);
+
+    // Group (id: 'root_node_port_date', name: 'port-group', y: 80, draggable: true)
+    var portGroup = new Konva.Group({
+      id: 'root_node_port_date',
+      name: 'port-group',
+      y: 80,
+      draggable: true,
+    });
+    portsGroup.add(portGroup);
+
+    // Rect (name: 'label-bg', y: -11, width: 60.9375, height: 22.4, stroke: 'red', fill: 'white', x: -12, cornerRadius: 14.4, opacity: 0.2)
+    var labelBg = new Konva.Rect({
+      name: 'label-bg',
+      y: -11,
+      width: 60.9375,
+      height: 22.4,
+      stroke: 'green',
+      fill: 'white',
+      x: -12,
+      cornerRadius: 14.4,
+      opacity: 0.2,
+    });
+    portGroup.add(labelBg);
+
+    // Circle (name: 'circle', radius: 5, fill: 'white', stroke: 'red', shadowColor: 'red', shadowEnabled: true, shadowBlur: 10, shadowOpacity: 0.75)
+    var circle = new Konva.Circle({
+      name: 'circle',
+      radius: 5,
+      fill: 'white',
+      stroke: 'red',
+      shadowColor: 'red',
+    });
+    portGroup.add(circle);
+
+    layer.draw();
+
+    // Clone before caching
+    var layerNonCached = layer.clone();
+    stage.add(layerNonCached);
+    layerNonCached.draw();
+
+    // Cache the nodeGroup
+    nodeGroup.cache();
+    layer.draw();
+
+    // Compare
+    compareLayers(layer, layerNonCached, 50);
   });
 });

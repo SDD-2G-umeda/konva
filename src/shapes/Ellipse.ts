@@ -1,10 +1,11 @@
-import { Factory } from '../Factory';
-import { Shape, ShapeConfig } from '../Shape';
-import { getNumberValidator } from '../Validators';
-import { _registerNode } from '../Global';
-import { Context } from '../Context';
+import { Factory } from '../Factory.ts';
+import type { ShapeConfig } from '../Shape.ts';
+import { Shape } from '../Shape.ts';
+import { getNumberValidator } from '../Validators.ts';
+import { _registerNode } from '../Global.ts';
+import type { Context } from '../Context.ts';
 
-import { GetSet, Vector2d } from '../types';
+import type { GetSet, Vector2d } from '../types.ts';
 
 export interface EllipseConfig extends ShapeConfig {
   radiusX: number;
@@ -31,7 +32,7 @@ export interface EllipseConfig extends ShapeConfig {
  */
 export class Ellipse extends Shape<EllipseConfig> {
   _sceneFunc(context: Context) {
-    var rx = this.radiusX(),
+    const rx = this.radiusX(),
       ry = this.radiusY();
 
     context.beginPath();

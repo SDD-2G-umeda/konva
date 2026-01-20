@@ -1,9 +1,12 @@
-import { Factory } from '../Factory';
-import { Node, Filter } from '../Node';
-import { getNumberValidator } from '../Validators';
+import { Factory } from '../Factory.ts';
+import type { Filter } from '../Node.ts';
+import { Node } from '../Node.ts';
+import { getNumberValidator } from '../Validators.ts';
 
 /**
  * Brighten Filter.
+ * @deprecated Use {@link Konva.Filters.Brightness} instead for CSS-compatible behavior.
+ * This filter uses additive brightness adjustment (adds a constant value to RGB channels).
  * @function
  * @memberof Konva.Filters
  * @param {Object} imageData
@@ -13,12 +16,11 @@ import { getNumberValidator } from '../Validators';
  * node.brightness(0.8);
  */
 export const Brighten: Filter = function (imageData) {
-  var brightness = this.brightness() * 255,
+  const brightness = this.brightness() * 255,
     data = imageData.data,
-    len = data.length,
-    i;
+    len = data.length;
 
-  for (i = 0; i < len; i += 4) {
+  for (let i = 0; i < len; i += 4) {
     // red
     data[i] += brightness;
     // green

@@ -1,18 +1,18 @@
 import { assert } from 'chai';
 
-import worldMap from '../assets/worldMap';
-import tiger from '../assets/tiger';
+import worldMap from '../assets/worldMap.ts';
+import tiger from '../assets/tiger.ts';
 
 import {
   addStage,
   Konva,
-  createCanvas,
+  createCanvasAndContext,
   compareLayerAndCanvas,
   cloneAndCompareLayer,
   isNode,
   assertAlmostDeepEqual,
   isBrowser,
-} from './test-utils';
+} from './test-utils.ts';
 
 describe('Path', function () {
   // ======================================================
@@ -196,8 +196,7 @@ describe('Path', function () {
 
     assert.equal(path.dataArray[1].command, 'L');
 
-    var canvas = createCanvas();
-    var context = canvas.getContext('2d');
+    const { canvas, context } = createCanvasAndContext();
     // stroke
     context.beginPath();
     context.moveTo(200, 100);
@@ -486,6 +485,122 @@ describe('Path', function () {
       trace,
       'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();moveTo(100,350);lineTo(150,325);translate(175,312.5);rotate(-0.524);scale(1,1);arc(0,0,27.951,-3.082,0.06,0);scale(1,1);rotate(0.524);translate(-175,-312.5);lineTo(250,275);translate(275,262.5);rotate(-0.524);scale(0.5,1);arc(0,0,55.826,-3.112,0.03,0);scale(2,1);rotate(0.524);translate(-275,-262.5);lineTo(350,225);translate(375,212.5);rotate(-0.524);scale(0.333,1);arc(0,0,83.719,-3.122,0.02,0);scale(3,1);rotate(0.524);translate(-375,-212.5);lineTo(450,175);translate(475,162.5);rotate(-0.524);scale(0.25,1);arc(0,0,111.615,-3.127,0.015,0);scale(4,1);rotate(0.524);translate(-475,-162.5);lineTo(550,125);fillStyle=none;fill();lineWidth=1;strokeStyle=#999;stroke();restore();'
     );
+  });
+
+  it('parses arc without separators after flags', function () {
+    const stage = addStage();
+    const layer = new Konva.Layer();
+    stage.add(layer);
+
+    const path = new Konva.Path({
+      data: 'M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z',
+      stroke: 'red',
+    });
+    layer.add(path);
+    layer.draw();
+
+    const arc = path.dataArray[3];
+    assert.equal(arc.command, 'A');
+    assert.closeTo(arc.points[0], 12, 0.001);
+    assert.closeTo(arc.points[1], 10.5, 0.001);
+    assert.closeTo(arc.points[2], 7.5, 0.001);
+    assert.closeTo(arc.points[3], 7.5, 0.001);
+    assert.closeTo(arc.points[4], Math.PI, 0.001);
+    assert.closeTo(arc.points[5], Math.PI, 0.001);
+    assert.equal(arc.points[6], 0);
+    assert.equal(arc.points[7], 1);
+  });
+
+  it('getPointAtLength regression around curvature', function () {
+    var stage = addStage({ draggable: true, scaleX: 1, scaleY: 1 });
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    const data =
+      'm 1633.8176,1077.4212 c 0,0 18.4277,-511.56464 -14.7423,-535.31585 -32.2488,-23.0917 -318.7995,-9.13506 -318.7995,-9.13506 H 830.3691 c 0,0 -182.43438,-54.81052 -189.80546,-129.7182 -3.97298,-40.37463 -16.58496,-164.43147 -16.58496,-164.43147 0,0 -60.81148,-89.5238 -180.59162,-95.00485 C 323.6069,138.33472 -4.4064367,134.68069 -4.4064367,134.68069';
+
+    var path = new Konva.Path({
+      stroke: 'red',
+      strokeWidth: 50,
+      data,
+    });
+    const path2 = new Path2D(data);
+    const customShape = new Konva.Shape({
+      stroke: 'blue',
+      strokeWidth: 50,
+      sceneFunc: function (context) {
+        context.beginPath();
+        context.stroke(path2);
+      },
+    });
+    layer.add(path);
+    layer.add(customShape);
+    stage.add(layer);
+
+    const lengths = [87.9549, 91.9549, 94.8549, 97.7549];
+    const colors = ['black', 'red', 'green', 'blue'];
+
+    if (isBrowser) {
+      const SVGPath = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'path'
+      ) as SVGPathElement;
+      SVGPath.setAttribute('d', data);
+
+      for (let idx = 0; idx < lengths.length; idx++) {
+        const len = lengths[idx];
+        const p = path.getPointAtLength(len)!;
+        const native = SVGPath.getPointAtLength(len);
+        // Should closely match the browser's native SVG implementation
+        assert(
+          Math.abs(p.x - native.x) <= 3,
+          'x: ' + p.x + ' native.x: ' + native.x
+        );
+        assert(
+          Math.abs(p.y - native.y) <= 3,
+          'y: ' + p.y + ' native.y: ' + native.y
+        );
+        // Visual marker
+        layer.add(
+          new Konva.Circle({
+            x: native.x,
+            y: native.y,
+            radius: 100,
+            fill: colors[idx] || 'black',
+            opacity: 0.5,
+            draggable: true,
+          })
+        );
+      }
+    } else {
+      // Node: just ensure points are valid numbers and reasonably continuous
+      const pts = lengths.map((len) => path.getPointAtLength(len)!);
+      pts.forEach((pt) => {
+        assert(!isNaN(pt.x) && !isNaN(pt.y));
+      });
+      // Visual markers for manual inspection if needed
+      for (let idx = 0; idx < pts.length; idx++) {
+        const p = pts[idx];
+        layer.add(
+          new Konva.Circle({
+            x: p.x,
+            y: p.y,
+            radius: 30,
+            fill: colors[idx],
+            scaleX: 0.1,
+            scaleY: 0.1,
+          })
+        );
+      }
+      // distances between successive points should be small (no big jumps)
+      const d01 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const d12 = Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y);
+      const d23 = Math.hypot(pts[3].x - pts[2].x, pts[3].y - pts[2].y);
+      assert(
+        d01 < 50 && d12 < 50 && d23 < 50,
+        'd01: ' + d01 + ' d12: ' + d12 + ' d23: ' + d23
+      );
+    }
   });
 
   // ======================================================
@@ -1083,6 +1198,7 @@ describe('Path', function () {
   it('get point at path', function () {
     var stage = addStage();
     var layer = new Konva.Layer();
+    stage.add(layer);
     const data =
       'M 300,10 L 250,100 A 100 40 30 1 0 150 150 C 160,100, 290,100, 300,150';
     var path = new Konva.Path({
@@ -1098,11 +1214,11 @@ describe('Path', function () {
       ) as SVGPathElement;
       SVGPath.setAttribute('d', data);
       for (var i = 0; i < path.getLength(); i += 1) {
-        var p = path.getPointAtLength(i);
+        var p = path.getPointAtLength(i)!;
         var circle = new Konva.Circle({
           x: p.x,
           y: p.y,
-          radius: 2,
+          radius: 0.1,
           fill: 'black',
           stroke: 'black',
         });
@@ -1118,9 +1234,9 @@ describe('Path', function () {
         );
       }
     } else {
-      var points = [];
+      var points: { x: number; y: number }[] = [];
       for (var i = 0; i < path.getLength(); i += 20) {
-        var p = path.getPointAtLength(i);
+        var p = path.getPointAtLength(i)!;
         points.push(p);
         var circle = new Konva.Circle({
           x: p.x,
@@ -1134,11 +1250,11 @@ describe('Path', function () {
 
       assert.deepEqual(points, [
         { x: 300, y: 10 },
-        { x: 290.2871413779118, y: 27.48314552325543 },
-        { x: 280.57428275582356, y: 44.96629104651086 },
-        { x: 270.86142413373534, y: 62.4494365697663 },
-        { x: 261.1485655116471, y: 79.93258209302172 },
-        { x: 251.43570688955887, y: 97.41572761627717 },
+        { x: 290.28714137642737, y: 27.483145522430753 },
+        { x: 280.57428275285474, y: 44.96629104486151 },
+        { x: 270.86142412928206, y: 62.44943656729226 },
+        { x: 261.1485655057094, y: 79.93258208972301 },
+        { x: 251.4357068821368, y: 97.41572761215377 },
         { x: 230.89220826660141, y: 87.23996356219386 },
         { x: 207.0639321224534, y: 74.08466390481559 },
         { x: 182.87529785963875, y: 63.52674972743341 },
@@ -1164,8 +1280,83 @@ describe('Path', function () {
         { x: 299.87435436448743, y: 149.4028482225714 },
       ]);
     }
+  });
 
+  it('get point at vertical path', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    const data = 'M 614.96002,7.5147864 611.20262,429.59529';
+    var path = new Konva.Path({
+      stroke: 'red',
+      strokeWidth: 3,
+      data,
+      x: -600,
+    });
+    layer.add(path);
+    if (isBrowser) {
+      const SVGPath = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'path'
+      ) as SVGPathElement;
+      SVGPath.setAttribute('d', data);
+      for (var i = 0.001; i < path.getLength(); i += 1) {
+        var p = path.getPointAtLength(i)!;
+        var circle = new Konva.Circle({
+          x: p.x + path.x(),
+          y: p.y + path.y(),
+          radius: 2,
+          fill: 'black',
+          stroke: 'black',
+        });
+        layer.add(circle);
+        const position = SVGPath.getPointAtLength(i);
+        assert(Math.abs(p.x - position.x) <= 1);
+        assert(Math.abs(p.y - position.y) <= 1);
+      }
+    }
     stage.add(layer);
+  });
+
+  it('get point at path with float attrs', function () {
+    var stage = addStage();
+    var layer = new Konva.Layer();
+    stage.add(layer);
+
+    const data =
+      'M419.0000314094981 342.88624187900973 L419.00003140949804 577.0038889378335 L465.014001082264 577.0038889378336 Z';
+    var path = new Konva.Path({
+      stroke: 'red',
+      strokeWidth: 3,
+      data,
+    });
+    layer.add(path);
+    if (isBrowser) {
+      const SVGPath = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'path'
+      ) as SVGPathElement;
+      SVGPath.setAttribute('d', data);
+      for (var i = 0; i < path.getLength(); i += 1) {
+        var p = path.getPointAtLength(i)!;
+        var circle = new Konva.Circle({
+          x: p.x,
+          y: p.y,
+          radius: 2,
+          fill: 'black',
+          stroke: 'black',
+        });
+        layer.add(circle);
+        const position = SVGPath.getPointAtLength(i);
+        assert(
+          Math.abs(p.x - position.x) <= 1,
+          'error for x should be smaller than 10% for i = ' + i
+        );
+        assert(
+          Math.abs(p.y - position.y) <= 1,
+          'error for y should be smaller than 10% for i = ' + i
+        );
+      }
+    }
   });
 
   it('get point at path - bezier', function () {
@@ -1186,7 +1377,7 @@ describe('Path', function () {
       ) as SVGPathElement;
       SVGPath.setAttribute('d', data);
       for (var i = 0; i < path.getLength(); i += 10) {
-        var p = path.getPointAtLength(i);
+        var p = path.getPointAtLength(i)!;
         var circle = new Konva.Circle({
           x: p.x,
           y: p.y,
@@ -1206,9 +1397,9 @@ describe('Path', function () {
         );
       }
     } else {
-      var points = [];
+      var points: { x: number; y: number }[] = [];
       for (var i = 0; i < path.getLength(); i += 500) {
-        var p = path.getPointAtLength(i);
+        var p = path.getPointAtLength(i)!;
         points.push(p);
         var circle = new Konva.Circle({
           x: p.x,
@@ -1618,8 +1809,11 @@ describe('Path', function () {
     layer.add(path);
     stage.add(layer);
 
-    const trace = layer.getContext().getTrace()
+    const trace = layer.getContext().getTrace();
 
-    assert.equal(trace, 'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();moveTo(200,100);lineTo(300,100);lineTo(300,150);closePath();fillStyle=#ccc;fill(evenodd);restore();');
+    assert.equal(
+      trace,
+      'clearRect(0,0,578,200);save();transform(1,0,0,1,0,0);beginPath();moveTo(200,100);lineTo(300,100);lineTo(300,150);closePath();fillStyle=#ccc;fill(evenodd);restore();'
+    );
   });
 });

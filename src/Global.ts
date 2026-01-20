@@ -128,10 +128,10 @@ export const glob: any =
   typeof global !== 'undefined'
     ? global
     : typeof window !== 'undefined'
-    ? window
-    : typeof WorkerGlobalScope !== 'undefined'
-    ? self
-    : {};
+      ? window
+      : typeof WorkerGlobalScope !== 'undefined'
+        ? self
+        : {};
 
 export const Konva = {
   _global: glob,
@@ -195,6 +195,17 @@ export const Konva = {
   _mouseDblClickPointerId: null,
   _touchDblClickPointerId: null,
   _pointerDblClickPointerId: null,
+  _renderBackend: 'web', // web, node-canvas, skia-canvas
+  /**
+   * Use legacy text rendering. with "middle" baseline by default.
+   * @property legacyTextRendering
+   * @default false
+   * @name legacyTextRendering
+   * @memberof Konva
+   * @example
+   * Konva.legacyTextRendering = true;
+   */
+  legacyTextRendering: false,
 
   /**
    * Global pixel ratio configuration. KonvaJS automatically detect pixel ratio of current device.
@@ -213,7 +224,7 @@ export const Konva = {
    * Drag distance property. If you start to drag a node you may want to wait until pointer is moved to some distance from start point,
    * only then start dragging. Default is 3px.
    * @property dragDistance
-   * @default 0
+   * @default 3
    * @memberof Konva
    * @example
    * Konva.dragDistance = 10;
@@ -242,9 +253,9 @@ export const Konva = {
 
   /**
    * Configure what mouse buttons can be used for drag and drop.
-   * Default value is [0] - only left mouse button.
+   * Default value is [0, 1] - left and middle mouse buttons.
    * @property dragButtons
-   * @default true
+   * @default [0, 1]
    * @memberof Konva
    * @example
    * // enable left and right mouse buttons
@@ -257,11 +268,11 @@ export const Konva = {
    * @method
    * @memberof Konva
    */
-  isDragging() {
+  isDragging(): boolean {
     return Konva['DD'].isDragging;
   },
-  isTransforming() {
-    return Konva['Transformer']?.isTransforming();
+  isTransforming(): boolean {
+    return Konva['Transformer']?.isTransforming() ?? false;
   },
   /**
    * returns whether or not a drag and drop operation is ready, but may
@@ -288,6 +299,11 @@ export const Konva = {
   // insert Konva into global namespace (window)
   // it is required for npm packages
   _injectGlobal(Konva) {
+    if (typeof glob.Konva !== 'undefined') {
+      console.error(
+        'Several Konva instances detected. It is not recommended to use multiple Konva instances in the same environment.'
+      );
+    }
     glob.Konva = Konva;
   },
 };

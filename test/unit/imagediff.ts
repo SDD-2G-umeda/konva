@@ -1,4 +1,5 @@
-import { createCanvas, Canvas } from 'canvas';
+import KonvaModule from '../../src/index.ts';
+export const Konva = KonvaModule;
 
 var TYPE_ARRAY = /\[object Array\]/i,
   TYPE_CANVAS = /\[object (Canvas|HTMLCanvasElement)\]/i,
@@ -6,15 +7,24 @@ var TYPE_ARRAY = /\[object Array\]/i,
   TYPE_CONTEXT = /\[object CanvasRenderingContext2D\]/i,
   TYPE_IMAGE = /\[object (Image|HTMLImageElement)\]/i,
   TYPE_IMAGE_DATA = /\[object ImageData\]/i,
-  UNDEFINED = 'undefined',
-  canvas = getCanvas(),
-  context = canvas.getContext('2d');
+  UNDEFINED = 'undefined';
 
 // Creation
 function getCanvas(width?, height?) {
-  return createCanvas(width, height);
+  return Konva.Util.createCanvasElement();
 }
+
+let singleCanvas;
+function getSingleCanvas() {
+  if (!singleCanvas) {
+    singleCanvas = getCanvas();
+  }
+  return singleCanvas;
+}
+
 function getImageData(width, height) {
+  const canvas = getSingleCanvas();
+  const context = canvas.getContext('2d');
   canvas.width = width;
   canvas.height = height;
   context.clearRect(0, 0, width, height);
@@ -26,7 +36,7 @@ function isImage(object) {
   return isType(object, TYPE_IMAGE);
 }
 function isCanvas(object) {
-  return isType(object, TYPE_CANVAS) || object instanceof Canvas;
+  return isType(object, TYPE_CANVAS);
 }
 function isContext(object) {
   return isType(object, TYPE_CONTEXT);
@@ -49,27 +59,23 @@ function isImageType(object) {
   );
 }
 function isType(object, type) {
-  return (
-    typeof object === 'object' &&
-    !!Object.prototype.toString.apply(object).match(type)
-  );
+  return typeof object === 'object' && !!object.toString().match(type);
 }
 
 // Type Conversion
 function copyImageData(imageData) {
-  var height = imageData.height,
+  const height = imageData.height,
     width = imageData.width,
-    data = imageData.data,
-    newImageData,
-    newData,
-    i;
+    data = imageData.data;
 
+  const canvas = getSingleCanvas();
+  const context = canvas.getContext('2d');
   canvas.width = width;
   canvas.height = height;
-  newImageData = context.getImageData(0, 0, width, height);
-  newData = newImageData.data;
+  const newImageData = context.getImageData(0, 0, width, height);
+  const newData = newImageData.data;
 
-  for (i = imageData.data.length; i--; ) {
+  for (let i = imageData.data.length; i--; ) {
     newData[i] = data[i];
   }
 
@@ -90,8 +96,10 @@ function toImageData(object) {
   }
 }
 function toImageDataFromImage(image) {
-  var height = image.height,
+  const height = image.height,
     width = image.width;
+  const canvas = getSingleCanvas();
+  const context = canvas.getContext('2d');
   canvas.width = width;
   canvas.height = height;
   context.clearRect(0, 0, width, height);
@@ -99,7 +107,7 @@ function toImageDataFromImage(image) {
   return context.getImageData(0, 0, width, height);
 }
 function toImageDataFromCanvas(canvas) {
-  var height = canvas.height,
+  const height = canvas.height,
     width = canvas.width,
     context = canvas.getContext('2d');
   if (!width || !height) {
@@ -109,15 +117,15 @@ function toImageDataFromCanvas(canvas) {
   return context.getImageData(0, 0, width, height);
 }
 function toImageDataFromContext(context) {
-  var canvas = context.canvas,
+  const canvas = context.canvas,
     height = canvas.height,
     width = canvas.width;
   return context.getImageData(0, 0, width, height);
 }
 function toCanvas(object) {
-  var data = toImageData(object),
+  const data = toImageData(object),
     canvas = getCanvas(data.width, data.height),
-    context = canvas.getContext('2d');
+    context = canvas.getContext('2d')!;
 
   context.putImageData(data, 0, 0);
   return canvas;
@@ -135,16 +143,15 @@ function equalDimensions(a, b) {
 }
 
 export function equal(a, b, tolerance, secondTol) {
-  var aData = a.data,
+  const aData = a.data,
     bData = b.data,
-    length = aData.length,
-    i;
+    length = aData.length;
 
   tolerance = tolerance || 0;
 
-  var count = 0;
+  let count = 0;
   if (!equalDimensions(a, b)) return false;
-  for (i = length; i--; ) {
+  for (let i = length; i--; ) {
     const d = Math.abs(aData[i] - bData[i]);
     if (aData[i] !== bData[i] && d > tolerance) {
       if (!secondTol) {
@@ -168,21 +175,15 @@ function diff(a, b, options) {
   return (equalDimensions(a, b) ? diffEqual : diffUnequal)(a, b, options);
 }
 function diffEqual(a, b, options) {
-  var height = a.height,
+  const height = a.height,
     width = a.width,
     c = getImageData(width, height), // c = a - b
     aData = a.data,
     bData = b.data,
     cData = c.data,
-    length = cData.length,
-    row,
-    column,
-    i,
-    j,
-    k,
-    v;
+    length = cData.length;
 
-  for (i = 0; i < length; i += 4) {
+  for (let i = 0; i < length; i += 4) {
     cData[i] = Math.abs(aData[i] - bData[i]);
     cData[i + 1] = Math.abs(aData[i + 1] - bData[i + 1]);
     cData[i + 2] = Math.abs(aData[i + 2] - bData[i + 2]);
@@ -192,32 +193,25 @@ function diffEqual(a, b, options) {
   return c;
 }
 function diffUnequal(a, b, options) {
-  var height = Math.max(a.height, b.height),
+  const height = Math.max(a.height, b.height),
     width = Math.max(a.width, b.width),
     c = getImageData(width, height), // c = a - b
     aData = a.data,
     bData = b.data,
     cData = c.data,
-    align = options && options.align,
-    rowOffset,
-    columnOffset,
-    row,
-    column,
-    i,
-    j,
-    k,
-    v;
+    align = options && options.align;
+  var rowOffset, columnOffset;
 
-  for (i = cData.length - 1; i > 0; i = i - 4) {
+  for (let i = cData.length - 1; i > 0; i = i - 4) {
     cData[i] = 255;
   }
 
   // Add First Image
   offsets(a);
-  for (row = a.height; row--; ) {
-    for (column = a.width; column--; ) {
-      i = 4 * ((row + rowOffset) * width + (column + columnOffset));
-      j = 4 * (row * a.width + column);
+  for (let row = a.height; row--; ) {
+    for (let column = a.width; column--; ) {
+      const i = 4 * ((row + rowOffset) * width + (column + columnOffset));
+      const j = 4 * (row * a.width + column);
       cData[i + 0] = aData[j + 0]; // r
       cData[i + 1] = aData[j + 1]; // g
       cData[i + 2] = aData[j + 2]; // b
@@ -227,10 +221,10 @@ function diffUnequal(a, b, options) {
 
   // Subtract Second Image
   offsets(b);
-  for (row = b.height; row--; ) {
-    for (column = b.width; column--; ) {
-      i = 4 * ((row + rowOffset) * width + (column + columnOffset));
-      j = 4 * (row * b.width + column);
+  for (let row = b.height; row--; ) {
+    for (let column = b.width; column--; ) {
+      const i = 4 * ((row + rowOffset) * width + (column + columnOffset));
+      const j = 4 * (row * b.width + column);
       cData[i + 0] = Math.abs(cData[i + 0] - bData[j + 0]); // r
       cData[i + 1] = Math.abs(cData[i + 1] - bData[j + 1]); // g
       cData[i + 2] = Math.abs(cData[i + 2] - bData[j + 2]); // b
@@ -253,13 +247,12 @@ function diffUnequal(a, b, options) {
 
 // Validation
 function checkType(...args) {
-  var i;
-  for (i = 0; i < args.length; i++) {
+  for (let i = 0; i < args.length; i++) {
     if (!isImageType(args[i])) {
-      throw {
-        name: 'ImageTypeError',
-        message: 'Submitted object was not an image.',
-      };
+      // throw {
+      //   name: 'ImageTypeError',
+      //   message: 'Submitted object was not an image.',
+      // };
     }
   }
 }
